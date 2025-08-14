@@ -1,0 +1,68 @@
+name: basirah
+description: "Basirah App"
+publish_to: 'none' 
+
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.3.0 <4.0.0' # It's good practice to allow a range
+
+dependencies:
+  flutter:
+    sdk: flutter
+  http: ^1.2.1
+  cupertino_icons: ^1.0.8
+  shared_preferences: ^2.0.0
+  rxdart: ^0.27.7
+  video_player: ^2.4.5
+  
+  # --- THE KEY FIX IS HERE ---
+  # Using the latest STABLE version of youtube_player_flutter.
+  # This version is compatible with modern Firebase and flutter_inappwebview.
+  youtube_player_flutter: ^9.0.0
+  
+  # This version is compatible with the stable youtube_player and Firebase.
+  flutter_inappwebview: ^6.0.0  
+  
+  just_audio: ^0.9.24
+  provider: ^6.1.2
+  logger: ^1.1.0
+  connectivity_plus: ^5.0.1
+  # LATEST STABLE FIREBASE VERSIONS (KEEP THESE)
+  firebase_core: ^2.30.0
+  firebase_messaging: ^14.9.2
+  
+  flutter_local_notifications: ^17.0.0
+  permission_handler: ^11.3.0
+  timezone: ^0.9.4 
+  flutter_feather_icons: ^2.0.0+1
+  badges: ^3.1.2
+  device_info_plus: ^9.0.0
+  uuid: ^4.3.3
+  flutter_stripe: ^10.1.1 
+  webview_flutter: ^4.7.0 
+  url_launcher: ^6.2.6
+  
+  
+  # url_launcher_web is brought in by url_launcher, so it's not always needed here.
+  # If you get an error without it, you can add it back.
+  # url_launcher_web: ^2.3.1
+  
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+
+flutter:
+  uses-material-design: true
+
+  # Define assets section for including images
+  assets:
+    - assets/Basirah_splash.png
+    - assets/stripe_logo.png
+    - assets/chapa_logo.png
+    - assets/images/quran_1.jpg
+    - assets/images/quran_2.jpg
+    - assets/images/quran_3.jpg
+    - assets/images/quran_4.jpg
+    - assets/images/logo.png

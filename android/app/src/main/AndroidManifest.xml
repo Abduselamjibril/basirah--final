@@ -1,0 +1,54 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- Internet Permission -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Notification Permission for Android 13+ -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+    <!-- Optional: For exact scheduled alarms if you use them -->
+    <!-- <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" /> -->
+    <!-- <uses-permission android:name="android.permission.USE_EXACT_ALARM" /> -->
+
+
+    <application
+        android:label="basirah"
+        android:name="${applicationName}"
+        android:icon="@mipmap/ic_launcher"
+        android:usesCleartextTraffic="true">
+
+        <!-- Default Notification Icon (ensure ic_stat_notification.png is in res/drawable) -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_icon"
+            android:resource="@drawable/ic_stat_basirah" />
+        <!-- You can also set a default color for the icon if needed -->
+        <!-- <meta-data
+            android:name="com.google.firebase.messaging.default_notification_color"
+            android:resource="@color/notification_icon_color" /> -->
+        <!-- (Create colors.xml in res/values/ if you use the color) -->
+
+
+        <activity
+            android:name=".MainActivity"
+            android:launchMode="singleTop"
+            android:theme="@style/LaunchTheme"
+            android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|fontScale|screenLayout|uiMode|density"
+            android:hardwareAccelerated="true"
+            android:windowSoftInputMode="adjustResize"
+            android:exported="true">
+
+            <meta-data
+                android:name="flutterEmbedding"
+                android:value="2" />
+
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+
+            <!-- For handling notification tap when app is terminated (via flutter_local_notifications) -->
+            <intent-filter>
+                <action android:name="FLUTTER_NOTIFICATION_CLICK" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
+    </application>
+</manifest>
