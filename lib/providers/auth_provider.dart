@@ -1,5 +1,3 @@
-// lib/providers/auth_provider.dart
-
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/auth_http_service.dart';
@@ -8,35 +6,37 @@ class AuthProvider with ChangeNotifier {
   // --- Private state variables ---
   String? _token;
   String? _userPhoneNumber;
+  // --- ADDED ---
+  String? _userFirstName;
+  String? _userLastName;
+  // -----------
   bool _isPremium = false;
   bool _isLoggedIn = false;
 
   // --- Public getters ---
   String? get token => _token;
   String? get userPhoneNumber => _userPhoneNumber;
+  // --- ADDED ---
+  String? get userFirstName => _userFirstName;
+  String? get userLastName => _userLastName;
+  // -----------
   bool get isPremium => _isPremium;
   bool get isLoggedIn => _isLoggedIn;
 
-  // --- MODIFICATION: The constructor is now empty. ---
-  // The logic is moved to `tryAutoLogin` to give the splash screen full control.
   AuthProvider();
 
-  // --- NEW METHOD to handle auto-login on startup ---
-  /// Checks SharedPreferences on app startup to restore a valid, non-expired session.
-  /// This is called EXPLICITLY by the splash screen.
-  /// Returns `true` if the user is successfully logged in, `false` otherwise.
   Future<bool> tryAutoLogin() async {
     final prefs = await SharedPreferences.getInstance();
 
     final storedToken = prefs.getString('token');
     if (storedToken == null || storedToken.isEmpty) {
       _isLoggedIn = false;
-      return false; // No token, definitely not logged in.
+      return false;
     }
 
     final loginTimestamp = prefs.getInt('login_timestamp');
     if (loginTimestamp == null) {
-      await logout(); // Clean up inconsistent state if there's a token but no timestamp.
+      await logout();
       return false;
     }
 
@@ -44,37 +44,33 @@ class AuthProvider with ChangeNotifier {
     final currentTime = DateTime.now();
     final difference = currentTime.difference(loginTime);
 
-    // This is your core 3-day expiration logic. It is correct.
     if (difference.inDays >= 3) {
       debugPrint(
           "AuthProvider: Session expired after ${difference.inDays} days. Forcing logout.");
-      await logout(); // Full logout to clear backend and local data.
-      return false; // Session expired.
+      await logout();
+      return false;
     }
 
-    // If we reach here, the session is valid. Let's load the user data.
-    final storedPhoneNumber = prefs.getString('userPhoneNumber');
-    final storedIsPremium = prefs.getBool('is_premium') ?? false;
-
+    // Load all user data from SharedPreferences
     _token = storedToken;
-    _userPhoneNumber = storedPhoneNumber;
-    _isPremium = storedIsPremium;
+    _userPhoneNumber = prefs.getString('userPhoneNumber');
+    _userFirstName = prefs.getString('userFirstName'); // <-- UPDATED
+    _userLastName = prefs.getString('userLastName'); // <-- UPDATED
+    _isPremium = prefs.getBool('is_premium') ?? false;
     _isLoggedIn = true;
 
-    // Notify listeners so UI can update if needed, but the primary navigation
-    // will be handled by the splash screen that called this method.
     notifyListeners();
-
     debugPrint("AuthProvider: Auto-login successful. Session restored.");
-    return true; // Successfully restored the session.
+    return true;
   }
 
-  /// Saves session state and login timestamp after a successful API login.
   Future<void> login(String token, Map<String, dynamic> userData) async {
     if (token.isEmpty) return;
 
     _token = token;
     _userPhoneNumber = userData['phone_number'];
+    _userFirstName = userData['first_name']; // <-- UPDATED
+    _userLastName = userData['last_name']; // <-- UPDATED
     _isPremium = userData['is_subscribed_and_active'] ?? false;
     _isLoggedIn = true;
 
@@ -86,15 +82,35 @@ class AuthProvider with ChangeNotifier {
     await prefs.setString('userLastName', userData['last_name']);
     await prefs.setBool('isLoggedIn', true);
 
-    // Set the timestamp that `tryAutoLogin` will check
     await prefs.setInt(
         'login_timestamp', DateTime.now().millisecondsSinceEpoch);
 
     notifyListeners();
   }
 
-  /// Performs a full logout: invalidates the session on the backend
-  /// and then clears all local user data.
+  // --- NEW METHOD to be called from EditProfilePage ---
+  /// Updates the user's profile data in the provider and SharedPreferences.
+  Future<void> updateUserProfile(Map<String, dynamic> updatedUserData) async {
+    _userFirstName = updatedUserData['first_name'] as String?;
+    _userLastName = updatedUserData['last_name'] as String?;
+    _userPhoneNumber = updatedUserData['phone_number'] as String?;
+
+    final prefs = await SharedPreferences.getInstance();
+    if (_userFirstName != null) {
+      await prefs.setString('userFirstName', _userFirstName!);
+    }
+    if (_userLastName != null) {
+      await prefs.setString('userLastName', _userLastName!);
+    }
+    if (_userPhoneNumber != null) {
+      await prefs.setString('userPhoneNumber', _userPhoneNumber!);
+    }
+
+    notifyListeners();
+    debugPrint("AuthProvider: User profile updated and state notified.");
+  }
+  // --------------------------------------------------------
+
   Future<void> logout() async {
     final prefs = await SharedPreferences.getInstance();
     final tokenForApiCall = prefs.getString('token');
@@ -114,6 +130,8 @@ class AuthProvider with ChangeNotifier {
     // Clear state from memory
     _token = null;
     _userPhoneNumber = null;
+    _userFirstName = null; // <-- UPDATED
+    _userLastName = null; // <-- UPDATED
     _isPremium = false;
     _isLoggedIn = false;
 

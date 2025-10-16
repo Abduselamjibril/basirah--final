@@ -18,12 +18,13 @@ import 'topbar/account_page.dart';
 import 'topbar/login_page.dart';
 import 'topbar/signup_page.dart';
 import 'topbar/profile_page.dart';
+import 'topbar/edit_profile_page.dart'; // <-- ADDED IMPORT
 import 'topbar/faq_page.dart';
 import 'splash_screen.dart';
 import 'theme_provider.dart';
 import 'services/notification_service.dart';
 import 'services/auth_http_service.dart';
-import 'services/security_service.dart';
+
 import 'package:basirah/screens/gift_page.dart';
 import 'firebase_options.dart';
 
@@ -38,8 +39,6 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   final notificationService = NotificationService();
   await notificationService.initNotifications(null);
 
-  // --- THE FIX: Read from the data payload ---
-  // message.notification will be null, so we must use message.data.
   final data = message.data;
   final title = data['title'] ?? 'New Message';
   final body = data['body'] ?? 'You have a new update.';
@@ -50,7 +49,6 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
     body: body,
     payload: json.encode(data),
   );
-  // --- END OF FIX ---
 }
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
@@ -60,7 +58,6 @@ final ThemeProvider themeProvider = ThemeProvider();
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await SecurityService.secureApp();
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
@@ -88,8 +85,6 @@ void _setupFirebaseListeners() {
   FirebaseMessaging.onMessage.listen((RemoteMessage message) {
     print('Got a message whilst in the foreground!');
 
-    // --- THE FIX: Read from the data payload ---
-    // message.notification will be null, so we must use message.data.
     final data = message.data;
     final title = data['title'] ?? 'New Notification';
     final body = data['body'] ?? 'You have a new update.';
@@ -100,9 +95,7 @@ void _setupFirebaseListeners() {
       body: body,
       payload: json.encode(message.data),
     );
-    // --- END OF FIX ---
 
-    // This logic to refresh the in-app list is still correct and necessary
     final context = navigatorKey.currentContext;
     if (context != null) {
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
@@ -153,8 +146,9 @@ class BayyinahCloneApp extends StatelessWidget {
         '/login': (context) => LoginPage(),
         '/account': (context) => AccountPage(),
         '/faq': (context) => FaqPage(),
-        '/profile': (context) =>
-            const ProfilePage(name: '', lastName: '', phoneNumber: ''),
+        '/profile': (context) => const ProfilePage(),
+        '/edit-profile': (context) =>
+            const EditProfilePage(), // <-- ADDED ROUTE
         '/home': (context) => const MainScreen(),
       },
       debugShowCheckedModeBanner: false,
@@ -163,7 +157,12 @@ class BayyinahCloneApp extends StatelessWidget {
 }
 
 class MainScreen extends StatefulWidget {
-  const MainScreen({super.key});
+  final String? postLoginMessage;
+
+  const MainScreen({
+    super.key,
+    this.postLoginMessage,
+  });
 
   @override
   _MainScreenState createState() => _MainScreenState();
@@ -185,7 +184,31 @@ class _MainScreenState extends State<MainScreen> {
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
     authProvider.addListener(_onAuthStateChanged);
 
+    // This logic correctly shows the post-login message safely
+    // after the MainScreen has been built.
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (widget.postLoginMessage != null && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              widget.postLoginMessage!,
+              style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white),
+              textAlign: TextAlign.center,
+            ),
+            backgroundColor: Colors.green,
+            behavior: SnackBarBehavior.floating,
+            margin:
+                const EdgeInsets.symmetric(horizontal: 24.0, vertical: 100.0),
+            shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10.0)),
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
+
       _triggerInitialDataFetch();
     });
   }

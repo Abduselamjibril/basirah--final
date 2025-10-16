@@ -1,12 +1,10 @@
-// ios/Runner/AppDelegate.swift
-
 import UIKit
 import Flutter
 
 @main
 @objc class AppDelegate: FlutterAppDelegate {
 
-  // MARK: - Properties for Screen Protection
+  // A view to cover the screen when recording is detected
   var screenProtectionView: UIView?
 
   override func application(
@@ -15,69 +13,76 @@ import Flutter
   ) -> Bool {
     GeneratedPluginRegistrant.register(with: self)
 
-    // --- Your existing UNUserNotificationCenterDelegate setup ---
     if #available(iOS 10.0, *) {
       UNUserNotificationCenter.current().delegate = self as? UNUserNotificationCenterDelegate
     }
-    // --- End of your existing code ---
-
-    // Add the notification observers to handle screen protection
-    setupScreenProtectionObservers()
+    
+    // Set up screen recording protection
+    setupScreenRecordingProtection()
 
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
   }
 
-  // MARK: - Screen Protection Logic (Replaces all old channel code)
-  
-  private func setupScreenProtectionObservers() {
-    // App is moving to background (app switcher)
-    NotificationCenter.default.addObserver(self, selector: #selector(showProtection), name: UIApplication.willResignActiveNotification, object: nil)
+  private func setupScreenRecordingProtection() {
+    // Listen for screen recording status changes
+    NotificationCenter.default.addObserver(self, selector: #selector(handleScreenRecordingStateChanged), name: UIScreen.capturedDidChangeNotification, object: nil)
     
-    // App is coming back to foreground
-    NotificationCenter.default.addObserver(self, selector: #selector(hideProtection), name: UIApplication.didBecomeActiveNotification, object: nil)
-    
-    // User takes a screenshot
-    NotificationCenter.default.addObserver(self, selector: #selector(showProtection), name: UIApplication.userDidTakeScreenshotNotification, object: nil)
-    
-    // Check for screen recording status changes
-    if #available(iOS 11.0, *) {
-      NotificationCenter.default.addObserver(self, selector: #selector(handleScreenCaptureChange), name: UIScreen.capturedDidChangeNotification, object: nil)
+    // Also listen for screenshot notifications
+    NotificationCenter.default.addObserver(self, selector: #selector(handleScreenshotTaken), name: UIApplication.userDidTakeScreenshotNotification, object: nil)
+
+    // Initial check
+    handleScreenRecordingStateChanged()
+  }
+
+  @objc private func handleScreenRecordingStateChanged() {
+    DispatchQueue.main.async {
+      let isRecording = UIScreen.main.isCaptured
+      if isRecording {
+        self.showProtectionView()
+      } else {
+        self.hideProtectionView()
+      }
     }
   }
-  
-  // This function is called when screen recording starts or stops
-  @objc private func handleScreenCaptureChange() {
-      if UIScreen.main.isCaptured {
-          showProtection()
-      } else {
-          // Important: Only hide if the app is active. Don't hide if it's in the background.
-          if UIApplication.shared.applicationState == .active {
-              hideProtection()
-          }
-      }
+    
+  @objc private func handleScreenshotTaken() {
+    // When a screenshot is taken, we flash the protection view briefly
+    // This obscures the content in the screenshot itself
+    showProtectionView()
+    // Hide it after a very short delay
+    DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+        self.handleScreenRecordingStateChanged() // Re-check recording state
+    }
   }
 
-  // This function displays the black overlay
-  @objc private func showProtection() {
-    guard let window = window, screenProtectionView == nil else { return }
+  private func showProtectionView() {
+    guard self.screenProtectionView == nil, let window = self.window else { return }
 
-    screenProtectionView = UIView(frame: window.bounds)
-    screenProtectionView?.backgroundColor = .black
+    let protectionView = UIView(frame: window.bounds)
+    protectionView.backgroundColor = .black
 
     let label = UILabel()
-    label.text = "Content is Secured"
+    label.text = "Screen recording and screenshots are not permitted."
     label.textColor = .white
     label.textAlignment = .center
+    label.numberOfLines = 0
+    label.translatesAutoresizingMaskIntoConstraints = false
     
-    screenProtectionView!.addSubview(label)
-    label.frame = window.bounds
+    protectionView.addSubview(label)
+    
+    NSLayoutConstraint.activate([
+        label.centerXAnchor.constraint(equalTo: protectionView.centerXAnchor),
+        label.centerYAnchor.constraint(equalTo: protectionView.centerYAnchor),
+        label.leadingAnchor.constraint(equalTo: protectionView.leadingAnchor, constant: 20),
+        label.trailingAnchor.constraint(equalTo: protectionView.trailingAnchor, constant: -20)
+    ])
 
-    window.addSubview(screenProtectionView!)
+    window.addSubview(protectionView)
+    self.screenProtectionView = protectionView
   }
 
-  // This function removes the black overlay
-  @objc private func hideProtection() {
-    screenProtectionView?.removeFromSuperview()
-    screenProtectionView = nil
+  private func hideProtectionView() {
+    self.screenProtectionView?.removeFromSuperview()
+    self.screenProtectionView = nil
   }
 }

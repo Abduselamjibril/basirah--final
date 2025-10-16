@@ -1,87 +1,26 @@
+// lib/topbar/profile_page.dart
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'login_page.dart';
 import '../theme_provider.dart';
 import 'about_page.dart';
 import 'faq_page.dart';
-import '../services/auth_http_service.dart';
 import '../providers/auth_provider.dart';
-import 'change_password_page.dart'; // <-- Import for the new page
+import 'change_password_page.dart';
+import 'edit_profile_page.dart';
 
-class ProfilePage extends StatefulWidget {
-  final String name;
-  final String lastName;
-  final String phoneNumber;
+class ProfilePage extends StatelessWidget {
+  const ProfilePage({Key? key}) : super(key: key);
 
-  const ProfilePage({
-    Key? key,
-    this.name = '',
-    this.lastName = '',
-    this.phoneNumber = '',
-  }) : super(key: key);
+  Future<void> _logout(BuildContext context) async {
+    final navigator = Navigator.of(context);
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
 
-  @override
-  State<ProfilePage> createState() => _ProfilePageState();
-}
+    await authProvider.logout();
 
-class _ProfilePageState extends State<ProfilePage> {
-  late Future<Map<String, String>> _userDataFuture;
-  final AuthHttpService _authHttpService = AuthHttpService();
-
-  @override
-  void initState() {
-    super.initState();
-    _userDataFuture = _getUserData();
-  }
-
-  Future<Map<String, String>> _getUserData() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final name = prefs.getString('userName') ?? 'User';
-      final phoneNumber = prefs.getString('userPhoneNumber') ?? 'N/A';
-      final nameParts = name.trim().split(' ');
-      final firstName = nameParts.isNotEmpty ? nameParts[0] : '';
-      final lastName =
-          nameParts.length > 1 ? nameParts.sublist(1).join(' ') : '';
-      return {
-        'firstName': firstName,
-        'lastName': lastName,
-        'phoneNumber': phoneNumber
-      };
-    } catch (e) {
-      debugPrint("Error fetching user data: $e");
-      return {'firstName': 'User', 'lastName': '', 'phoneNumber': 'N/A'};
-    }
-  }
-
-  String _getInitials(Map<String, String> userData) {
-    final firstInitial = userData['firstName']?.isNotEmpty ?? false
-        ? userData['firstName']![0].toUpperCase()
-        : '';
-    final lastInitial = userData['lastName']?.isNotEmpty ?? false
-        ? userData['lastName']![0].toUpperCase()
-        : '';
-    return firstInitial + lastInitial;
-  }
-
-  String _hashPhoneNumber(String phoneNumber) {
-    if (phoneNumber == 'N/A' || phoneNumber.length < 4) return phoneNumber;
-    return '${'*' * (phoneNumber.length - 4)}${phoneNumber.substring(phoneNumber.length - 4)}';
-  }
-
-  Future<void> _logout() async {
-    try {
-      await _authHttpService.post('logout', {});
-      debugPrint('Successfully logged out from backend.');
-    } catch (e) {
-      debugPrint(
-          "Error calling backend logout, but proceeding with local data cleanup: $e");
-    }
-
-    if (mounted) {
-      await Provider.of<AuthProvider>(context, listen: false).logout();
-      Navigator.of(context).pushAndRemoveUntil(
+    if (navigator.mounted) {
+      navigator.pushAndRemoveUntil(
         MaterialPageRoute(
           builder: (_) => LoginPage(),
           settings: const RouteSettings(name: '/login'),
@@ -89,6 +28,17 @@ class _ProfilePageState extends State<ProfilePage> {
         (_) => false,
       );
     }
+  }
+
+  String _getInitials(String firstName, String lastName) {
+    final firstInitial = firstName.isNotEmpty ? firstName[0].toUpperCase() : '';
+    final lastInitial = lastName.isNotEmpty ? lastName[0].toUpperCase() : '';
+    return firstInitial + lastInitial;
+  }
+
+  String _hashPhoneNumber(String phoneNumber) {
+    if (phoneNumber == 'N/A' || phoneNumber.length < 4) return phoneNumber;
+    return '${'*' * (phoneNumber.length - 4)}${phoneNumber.substring(phoneNumber.length - 4)}';
   }
 
   @override
@@ -113,37 +63,36 @@ class _ProfilePageState extends State<ProfilePage> {
       backgroundColor: colors.scaffoldBackground,
       appBar: AppBar(
         leading: IconButton(
-            icon: Icon(Icons.arrow_back, color: colors.text),
+            icon: Icon(Icons.arrow_back,
+                color: isDarkMode ? colors.text : Colors.white),
             onPressed: () => Navigator.pop(context)),
         title: Text('PROFILE',
             style: TextStyle(
-                fontSize: 24, fontWeight: FontWeight.bold, color: colors.text)),
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+                color: isDarkMode ? colors.text : Colors.white)),
         centerTitle: false,
         backgroundColor:
             isDarkMode ? const Color(0xFF1E1E1E) : const Color(0xFF009B77),
         elevation: 0,
       ),
       body: SafeArea(
-        child: FutureBuilder<Map<String, String>>(
-          future: _userDataFuture,
-          builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting) {
-              return Center(
-                  child: CircularProgressIndicator(color: colors.primary));
-            }
-            if (snapshot.hasError || !snapshot.hasData) {
-              return _ErrorView(
-                  colors: colors,
-                  onRetry: () =>
-                      setState(() => _userDataFuture = _getUserData()));
-            }
-            final userData = snapshot.data!;
+        child: Consumer<AuthProvider>(
+          builder: (context, authProvider, child) {
+            // This now reliably gets the latest user data from the provider
+            final userData = {
+              'firstName': authProvider.userFirstName ?? 'User',
+              'lastName': authProvider.userLastName ?? '',
+              'phoneNumber': authProvider.userPhoneNumber ?? 'N/A'
+            };
+
             return _ProfileContent(
               userData: userData,
               colors: colors,
-              onLogout: _logout,
+              onLogout: () => _logout(context),
               hashPhoneNumber: _hashPhoneNumber,
-              getInitials: _getInitials,
+              getInitials: (data) =>
+                  _getInitials(data['firstName']!, data['lastName']!),
             );
           },
         ),
@@ -152,7 +101,6 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 }
 
-// Helper class for colors
 class _ProfileColors {
   final Color scaffoldBackground;
   final Color card;
@@ -176,40 +124,6 @@ class _ProfileColors {
   });
 }
 
-// Helper widget for error view
-class _ErrorView extends StatelessWidget {
-  final _ProfileColors colors;
-  final VoidCallback onRetry;
-  const _ErrorView({required this.colors, required this.onRetry});
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-        child: Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        Icon(Icons.error_outline_rounded, color: colors.error, size: 50),
-        const SizedBox(height: 16),
-        Text('Could Not Load Profile',
-            style: TextStyle(
-                fontSize: 18, fontWeight: FontWeight.bold, color: colors.text)),
-        const SizedBox(height: 8),
-        Text('There was an issue retrieving your data.',
-            style: TextStyle(color: colors.subText)),
-        const SizedBox(height: 20),
-        ElevatedButton.icon(
-          style: ElevatedButton.styleFrom(
-              backgroundColor: colors.primary,
-              foregroundColor: colors.onPrimary),
-          icon: const Icon(Icons.refresh, size: 18),
-          label: const Text('Retry'),
-          onPressed: onRetry,
-        ),
-      ],
-    ));
-  }
-}
-
-// Helper widget for main profile content
 class _ProfileContent extends StatelessWidget {
   final Map<String, String> userData;
   final _ProfileColors colors;
@@ -247,7 +161,6 @@ class _ProfileContent extends StatelessWidget {
   }
 }
 
-// Helper widget for the profile header section
 class _ProfileHeader extends StatelessWidget {
   final String displayName;
   final String phoneNumber;
@@ -300,7 +213,6 @@ class _ProfileHeader extends StatelessWidget {
   }
 }
 
-// Helper widget for the list of options
 class _ProfileOptions extends StatelessWidget {
   final _ProfileColors colors;
   const _ProfileOptions({required this.colors});
@@ -312,39 +224,47 @@ class _ProfileOptions extends StatelessWidget {
         color: colors.card,
         child: Column(children: [
           _ProfileOptionTile(
+              icon: Icons.edit_outlined,
+              title: 'Edit Profile',
+              onTap: () => Navigator.push(context,
+                  MaterialPageRoute(builder: (_) => const EditProfilePage())),
+              iconColor: colors.primary,
+              textColor: colors.text,
+              isFirst: true),
+          Divider(color: colors.divider, height: 1, indent: 68, endIndent: 16),
+          _ProfileOptionTile(
               icon: Icons.info_outline_rounded,
               title: 'About Basirah',
               onTap: () => Navigator.push(context,
                   MaterialPageRoute(builder: (_) => const AboutPage())),
               iconColor: colors.primary,
               textColor: colors.text,
-              isFirst: true),
+              isFirst: false),
           Divider(color: colors.divider, height: 1, indent: 68, endIndent: 16),
           _ProfileOptionTile(
-              icon: Icons.quiz_outlined,
-              title: 'FAQ',
-              onTap: () => Navigator.push(
-                  context, MaterialPageRoute(builder: (_) => FaqPage())),
-              iconColor: colors.primary,
-              textColor: colors.text,
-              isLast: false, // This is no longer the last item
+            icon: Icons.quiz_outlined,
+            title: 'FAQ',
+            onTap: () => Navigator.push(
+                context, MaterialPageRoute(builder: (_) => FaqPage())),
+            iconColor: colors.primary,
+            textColor: colors.text,
+            isLast: false,
           ),
           Divider(color: colors.divider, height: 1, indent: 68, endIndent: 16),
-          // --- NEW TILE ADDED FOR CHANGING PASSWORD ---
           _ProfileOptionTile(
               icon: Icons.password_rounded,
               title: 'Change Password',
               onTap: () => Navigator.push(
-                  context, MaterialPageRoute(builder: (_) => const ChangePasswordPage())),
+                  context,
+                  MaterialPageRoute(
+                      builder: (_) => const ChangePasswordPage())),
               iconColor: colors.primary,
               textColor: colors.text,
-              isLast: true // This is now the last item
-          ),
+              isLast: true),
         ]));
   }
 }
 
-// Helper widget for a single option tile in the list
 class _ProfileOptionTile extends StatelessWidget {
   final IconData icon;
   final String title;
@@ -394,7 +314,6 @@ class _ProfileOptionTile extends StatelessWidget {
   }
 }
 
-// Helper widget for the logout button
 class _LogoutButton extends StatelessWidget {
   final VoidCallback onPressed;
   const _LogoutButton({required this.onPressed});

@@ -12,7 +12,9 @@ import '../main.dart';
 import '../services/fcm_service.dart' as fcm_service;
 import '../providers/auth_provider.dart';
 import 'terms_and_agreement_page.dart';
-import 'package:logger/logger.dart'; // <-- ADD THIS IMPORT
+import 'package:logger/logger.dart';
+
+import 'privacy_policy_page.dart';
 
 class SignUpPage extends StatefulWidget {
   @override
@@ -20,7 +22,6 @@ class SignUpPage extends StatefulWidget {
 }
 
 class _SignUpPageState extends State<SignUpPage> {
-  // --- ADDED: Initialize the logger ---
   final Logger _logger = Logger();
 
   final TextEditingController _firstNameController = TextEditingController();
@@ -39,7 +40,7 @@ class _SignUpPageState extends State<SignUpPage> {
 
     if (!_agreedToTerms) {
       _showNotification(
-          'You must agree to the Terms and Agreement to register.',
+          'You must agree to the Terms and Privacy Policy to register.',
           Colors.redAccent);
       return;
     }
@@ -66,14 +67,15 @@ class _SignUpPageState extends State<SignUpPage> {
 
     setState(() => _isLoading = true);
 
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final navigator = Navigator.of(context);
+
     String deviceId = "unknown_device_id_reg";
     String deviceName = "Unknown Device Reg";
     try {
       deviceId = await _deviceInfoService.getDeviceId();
       deviceName = await _deviceInfoService.getDeviceModelName();
     } catch (e, s) {
-      // --- MODIFIED: Added stack trace parameter ---
-      // --- MODIFIED: Replaced print with logger ---
       _logger.e("Error getting device info for registration", e, s);
     }
 
@@ -85,7 +87,7 @@ class _SignUpPageState extends State<SignUpPage> {
     final body = jsonEncode({
       "first_name": firstName,
       "last_name": lastName,
-      "email": email.isEmpty ? null : email, // Send null if empty
+      "email": email.isEmpty ? null : email,
       "phone_number": phoneNumber,
       "password": password,
       "password_confirmation": password,
@@ -95,58 +97,20 @@ class _SignUpPageState extends State<SignUpPage> {
 
     _logger.i("Attempting to register user with phone: $phoneNumber");
 
-    // --- MODIFIED: Added detailed logging in try/catch ---
+    http.Response? response;
+    String? errorMessage;
+
     try {
-      final response = await http
+      response = await http
           .post(url, headers: headers, body: body)
           .timeout(const Duration(seconds: 20));
 
-      if (!mounted) return;
-
-      if (response.statusCode == 201) {
-        _logger.i(
-            "Registration API call successful (201). Body: ${response.body}");
-        final responseData = jsonDecode(response.body);
-        final String? token = responseData['token'];
-
-        if (token != null) {
-          final Map<String, dynamic> newUser_data = {
-            "first_name": firstName,
-            "last_name": lastName,
-            "phone_number": phoneNumber,
-            "email": email,
-            "is_subscribed_and_active": false,
-          };
-          Provider.of<AuthProvider>(context, listen: false)
-              .login(token, newUser_data);
-
-          _logger.i("User logged in, sending FCM token...");
-          fcm_service.updateAndSendFcmToken();
-
-          _showNotification('Registration successful!', Colors.green);
-
-          Navigator.pushAndRemoveUntil(
-            context,
-            MaterialPageRoute(builder: (context) => MainScreen()),
-            (Route<dynamic> route) => false,
-          );
-        } else {
-          _logger.w(
-              "Registration successful but token was null. Response: ${response.body}");
-          _showNotification(
-              'Registration successful, but auto-login failed. Please login.',
-              Colors.orangeAccent);
-          if (Navigator.canPop(context)) Navigator.pop(context);
-          return;
-        }
-      } else {
-        String errorMessage = 'Registration failed';
+      if (response.statusCode != 201) {
+        _logger.w(
+          'Registration failed with status code: ${response.statusCode}',
+          'Response Body: ${response.body}',
+        );
         try {
-          // Log the raw error response from the API
-          _logger.w(
-            'Registration failed with status code: ${response.statusCode}',
-            'Response Body: ${response.body}',
-          );
           final responseData = jsonDecode(response.body);
           if (responseData['errors'] != null && responseData['errors'] is Map) {
             final errors = responseData['errors'] as Map;
@@ -155,34 +119,66 @@ class _SignUpPageState extends State<SignUpPage> {
               if (firstErrorList is List && firstErrorList.isNotEmpty) {
                 errorMessage = firstErrorList.first;
               }
-            } else {
-              errorMessage = responseData['message'] ??
-                  'Registration failed (Code: ${response.statusCode})';
             }
-          } else if (responseData['message'] != null) {
+          }
+          if (errorMessage == null && responseData['message'] != null) {
             errorMessage = responseData['message'];
-          } else {
-            errorMessage = 'Registration failed (Code: ${response.statusCode})';
           }
         } catch (e) {
-          errorMessage = 'Registration failed (Code: ${response.statusCode})';
+          // Ignore JSON parsing errors
         }
-        _showNotification(errorMessage, Colors.redAccent);
+        errorMessage ??= 'Registration failed (Code: ${response.statusCode})';
       }
     } catch (error, stackTrace) {
-      _logger.e(
-        'An exception occurred during registration',
-        error,
-        stackTrace,
-      );
-      if (!mounted) return;
-      _showNotification(
-          error is TimeoutException
-              ? 'Request timed out. Please check connection.'
-              : 'An error occurred. Please try again.',
-          Colors.redAccent);
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
+      _logger.e('An exception occurred during registration', error, stackTrace);
+      errorMessage = error is TimeoutException
+          ? 'Request timed out. Please check connection.'
+          : 'An error occurred. Please try again.';
+    }
+
+    if (!mounted) return;
+
+    setState(() => _isLoading = false);
+
+    if (errorMessage != null) {
+      _showNotification(errorMessage, Colors.redAccent);
+    } else if (response != null) {
+      final responseData = jsonDecode(response.body);
+      final String? token = responseData['token'];
+
+      if (token != null) {
+        _logger.i(
+            "Registration API call successful (201). Body: ${response.body}");
+        final Map<String, dynamic> newUser_data = {
+          "first_name": firstName,
+          "last_name": lastName,
+          "phone_number": phoneNumber,
+          "email": email,
+          "is_subscribed_and_active": false,
+        };
+        authProvider.login(token, newUser_data);
+
+        _logger.i("User logged in, sending FCM token...");
+        fcm_service.updateAndSendFcmToken();
+
+        // --- FIX: Navigate to MainScreen and pass the message to it ---
+        // This avoids calling ScaffoldMessenger from a disposed context.
+        await navigator.pushAndRemoveUntil(
+          MaterialPageRoute(
+            builder: (context) => MainScreen(
+              postLoginMessage: 'Registration successful! Welcome.',
+            ),
+          ),
+          (Route<dynamic> route) => false,
+        );
+      } else {
+        _logger.w(
+            "Registration successful but token was null. Response: ${response.body}");
+        _showNotification(
+            'Registration successful, but auto-login failed. Please login.',
+            Colors.orangeAccent);
+        if (navigator.canPop()) navigator.pop();
+      }
     }
   }
 
@@ -207,6 +203,7 @@ class _SignUpPageState extends State<SignUpPage> {
 
   @override
   Widget build(BuildContext context) {
+    // ... rest of your build method is unchanged ...
     final themeProvider = Provider.of<ThemeProvider>(context);
     final isDark = themeProvider.isDarkMode;
 
@@ -234,12 +231,9 @@ class _SignUpPageState extends State<SignUpPage> {
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             Image.asset('assets/images/logo.png', width: 120, height: 120),
-
-            // --- MODIFIED: Increased space between logo and text ---
             const SizedBox(height: 3),
             Align(
                 alignment: Alignment.centerLeft,
-                // --- MODIFIED: Reduced font size of 'Create Account' text ---
                 child: Text('Create Account',
                     style: TextStyle(
                         fontSize: 23,
@@ -251,7 +245,6 @@ class _SignUpPageState extends State<SignUpPage> {
                 child: Text(
                     'Please fill in the details to create your account.',
                     style: TextStyle(fontSize: 13, color: promptTextColor))),
-
             const SizedBox(height: 20.0),
             _buildTextField(
                 controller: _firstNameController,
@@ -334,7 +327,10 @@ class _SignUpPageState extends State<SignUpPage> {
                       TextSpan(
                           text: "Login",
                           style: TextStyle(
-                              color: Colors.grey[600]!,
+                              color: isDark
+                                  ? Colors.white70
+                                  : Colors
+                                      .black, // Adjusted for better visibility in dark mode
                               fontSize: 16,
                               fontWeight: FontWeight.bold)),
                     ],
@@ -349,6 +345,16 @@ class _SignUpPageState extends State<SignUpPage> {
   }
 
   Widget _buildTermsAndAgreementCheckbox(bool isDark) {
+    final linkStyle = TextStyle(
+      color: Colors.blue.shade300,
+      fontWeight: FontWeight.bold,
+      decoration: TextDecoration.underline,
+    );
+    final textStyle = TextStyle(
+      color: isDark ? Colors.white70 : Colors.black54,
+      fontSize: 14,
+    );
+
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
@@ -360,22 +366,18 @@ class _SignUpPageState extends State<SignUpPage> {
             });
           },
           activeColor: const Color(0xFF009B77),
+          checkColor: Colors.white,
+          side: BorderSide(color: isDark ? Colors.grey[600]! : Colors.grey),
         ),
         Expanded(
           child: RichText(
             text: TextSpan(
-              style: TextStyle(
-                  color: isDark ? Colors.white70 : Colors.black54,
-                  fontSize: 14),
+              style: textStyle,
               children: [
                 const TextSpan(text: 'I have read and agree to the '),
                 TextSpan(
                   text: 'Terms and Agreement',
-                  style: const TextStyle(
-                    color: Colors.blue,
-                    fontWeight: FontWeight.bold,
-                    decoration: TextDecoration.underline,
-                  ),
+                  style: linkStyle,
                   recognizer: TapGestureRecognizer()
                     ..onTap = () {
                       Navigator.push(
@@ -383,6 +385,20 @@ class _SignUpPageState extends State<SignUpPage> {
                         MaterialPageRoute(
                             builder: (context) =>
                                 const TermsAndAgreementPage()),
+                      );
+                    },
+                ),
+                const TextSpan(text: ' and the '), // Added "and the"
+                TextSpan(
+                  text: 'Privacy Policy', // Added Privacy Policy link
+                  style: linkStyle,
+                  recognizer: TapGestureRecognizer()
+                    ..onTap = () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const PrivacyPolicyPage(),
+                        ),
                       );
                     },
                 ),

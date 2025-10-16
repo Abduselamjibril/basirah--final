@@ -12,7 +12,7 @@ import '../theme_provider.dart'; // Adjust path if necessary
 
 // --- Screen Recording Prevention Imports ---
 import 'dart:io' show Platform;
-import '../screen_capture_blocker.dart'; // Adjust path if necessary
+// Screen capture blocker functionality has been removed.
 
 // Define the Base URL
 const String _apiBaseUrl = "https://admin.basirahtv.com";
@@ -65,11 +65,6 @@ class _AudioPlayerPageState extends State<AudioPlayerPage>
   Timer? _progressUpdateTimer;
   bool _isCompleted = false;
 
-  bool _isIOSScreenRecording = false;
-  StreamSubscription<bool>? _iosScreenRecordingSubscription;
-  bool _hasShownRecordingDialog = false;
-
-  // --- initState, handlers, and core logic remain the same ---
   @override
   void initState() {
     super.initState();
@@ -81,107 +76,10 @@ class _AudioPlayerPageState extends State<AudioPlayerPage>
         _initAudioPlayer();
       }
     });
-
-    if (Platform.isIOS) {
-      ScreenCaptureBlocker.isScreenBeingRecorded().then((isRecording) {
-        if (mounted) {
-          setState(() => _isIOSScreenRecording = isRecording);
-          if (isRecording) _handleIOSScreenRecordingChange(true);
-        }
-      });
-      _iosScreenRecordingSubscription = ScreenCaptureBlocker
-          .screenRecordingStatusStream
-          .listen(_handleIOSScreenRecordingChange, onError: (error) {
-        print(
-            "[AudioPlayerPage] Error listening to screen recording stream: $error");
-        if (mounted) setState(() => _isIOSScreenRecording = false);
-      });
-    }
-  }
-
-  void _handleIOSScreenRecordingChange(bool isRecording) {
-    if (!mounted) return;
-    bool oldStatus = _isIOSScreenRecording;
-    setState(() => _isIOSScreenRecording = isRecording);
-
-    if (isRecording) {
-      print("[AudioPlayerPage] iOS screen recording detected! Pausing audio.");
-      if (_audioPlayer.playing) _audioPlayer.pause();
-      _showScreenRecordingWarningDialog();
-    } else {
-      if (oldStatus == true && isRecording == false) {
-        print("[AudioPlayerPage] iOS screen recording stopped.");
-        if (!_audioPlayer.playing &&
-            !_isLoading &&
-            _audioPlayer.processingState != ProcessingState.ready &&
-            !_hasError) {
-          print(
-              "[AudioPlayerPage] Attempting to initialize audio after screen recording stopped.");
-          _initAudioPlayer();
-        }
-      }
-    }
-  }
-
-  void _showScreenRecordingWarningDialog() {
-    if (!mounted ||
-        !Platform.isIOS ||
-        !_isIOSScreenRecording ||
-        _hasShownRecordingDialog) return;
-    setState(() => _hasShownRecordingDialog = true);
-
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (BuildContext dialogContext) {
-        final themeProvider =
-            Provider.of<ThemeProvider>(context, listen: false);
-        final isNightMode = themeProvider.isDarkMode;
-        return AlertDialog(
-          backgroundColor: isNightMode ? const Color(0xFF1E2A3A) : Colors.white,
-          title: Text("Screen Recording Active",
-              style: TextStyle(
-                  color: isNightMode ? Colors.white : Colors.black87)),
-          content: Text(
-              "To protect our content, audio playback is disabled while screen recording is active. Please stop recording to continue.",
-              style: TextStyle(
-                  color: isNightMode ? Colors.white70 : Colors.black54)),
-          actions: <Widget>[
-            TextButton(
-              child: const Text("OK",
-                  style: TextStyle(color: _playerPrimaryColor)),
-              onPressed: () {
-                Navigator.of(dialogContext).pop();
-                setState(() => _hasShownRecordingDialog = false);
-                ScreenCaptureBlocker.isScreenBeingRecorded()
-                    .then((isStillRecording) {
-                  if (mounted) {
-                    if (_isIOSScreenRecording && !isStillRecording) {
-                      _handleIOSScreenRecordingChange(false);
-                    } else {
-                      setState(() {
-                        _isIOSScreenRecording = isStillRecording;
-                      });
-                    }
-                  }
-                });
-              },
-            ),
-          ],
-        );
-      },
-    );
   }
 
   Future<void> _initAudioPlayer() async {
     if (!mounted) return;
-    if (Platform.isIOS && _isIOSScreenRecording) {
-      print(
-          "[AudioPlayerPage] iOS screen capture active, delaying audio initialization.");
-      setState(() => _isLoading = false);
-      _showScreenRecordingWarningDialog();
-      return;
-    }
 
     setState(() {
       _isLoading = true;
@@ -207,12 +105,6 @@ class _AudioPlayerPageState extends State<AudioPlayerPage>
           _progressUpdateTimer?.cancel();
         }
 
-        if (Platform.isIOS && _isIOSScreenRecording && state.playing) {
-          _audioPlayer.pause();
-          _showScreenRecordingWarningDialog();
-          return;
-        }
-
         if (state.playing) {
           if (!_isCompleted &&
               (_progressUpdateTimer == null ||
@@ -225,9 +117,7 @@ class _AudioPlayerPageState extends State<AudioPlayerPage>
           if (state.processingState != ProcessingState.completed &&
               _audioPlayer.position > Duration.zero &&
               !_isCompleted) {
-            if (!(Platform.isIOS && _isIOSScreenRecording)) {
-              _sendProgressUpdate();
-            }
+            _sendProgressUpdate();
           }
         }
       }, onError: (Object e, StackTrace stackTrace) {
@@ -243,7 +133,7 @@ class _AudioPlayerPageState extends State<AudioPlayerPage>
 
       await _audioPlayer
           .setAudioSource(AudioSource.uri(Uri.parse(widget.audioUrl)));
-      if (!(Platform.isIOS && _isIOSScreenRecording)) _audioPlayer.play();
+      _audioPlayer.play();
 
       if (!mounted) return;
       setState(() {
@@ -266,7 +156,7 @@ class _AudioPlayerPageState extends State<AudioPlayerPage>
     _progressUpdateTimer?.cancel();
     _progressUpdateTimer = Timer.periodic(const Duration(seconds: 15), (timer) {
       if (mounted && _audioPlayer.playing && !_isCompleted) {
-        if (!(Platform.isIOS && _isIOSScreenRecording)) _sendProgressUpdate();
+        _sendProgressUpdate();
       } else if (!mounted || !_audioPlayer.playing) {
         timer.cancel();
       }
@@ -275,7 +165,6 @@ class _AudioPlayerPageState extends State<AudioPlayerPage>
 
   Future<void> _sendProgressUpdate({bool isCompleted = false}) async {
     if (!mounted || (_isCompleted && isCompleted == false)) return;
-    if (Platform.isIOS && _isIOSScreenRecording && !isCompleted) return;
 
     final phoneNumber = await _getPhoneNumber();
     if (phoneNumber == null) return;
@@ -373,20 +262,19 @@ class _AudioPlayerPageState extends State<AudioPlayerPage>
     if (!mounted) return;
     if (state == AppLifecycleState.paused && _audioPlayer.playing) {
       _audioPlayer.pause();
-      if (!(Platform.isIOS && _isIOSScreenRecording)) _sendProgressUpdate();
+      _sendProgressUpdate();
     }
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    _iosScreenRecordingSubscription?.cancel();
     _progressUpdateTimer?.cancel();
     if (mounted &&
         _audioPlayer.playing &&
         !_isCompleted &&
         _audioPlayer.position > Duration.zero) {
-      if (!(Platform.isIOS && _isIOSScreenRecording)) _sendProgressUpdate();
+      _sendProgressUpdate();
     }
     _audioPlayer.dispose();
     super.dispose();
@@ -451,15 +339,12 @@ class _AudioPlayerPageState extends State<AudioPlayerPage>
                   const SizedBox(height: 40),
                   _buildTrackInfo(primaryTextColor, secondaryTextColor),
                   const Spacer(flex: 2),
-                  _buildPlayerControls(
-                      isNightMode, !(Platform.isIOS && _isIOSScreenRecording)),
+                  _buildPlayerControls(isNightMode),
                   const SizedBox(height: 20),
                 ],
               ),
             ),
           ),
-          if (Platform.isIOS && _isIOSScreenRecording)
-            _buildScreenRecordingOverlay(),
         ],
       ),
     );
@@ -554,38 +439,7 @@ class _AudioPlayerPageState extends State<AudioPlayerPage>
     );
   }
 
-  Widget _buildScreenRecordingOverlay() {
-    return Positioned.fill(
-      child: Container(
-        color: Colors.black.withOpacity(0.9),
-        alignment: Alignment.center,
-        child: Padding(
-          padding: const EdgeInsets.all(30.0),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.screen_share_outlined,
-                  color: Colors.yellow.shade700, size: 60),
-              const SizedBox(height: 20),
-              const Text("Screen Recording Active",
-                  style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 22,
-                      fontWeight: FontWeight.bold),
-                  textAlign: TextAlign.center),
-              const SizedBox(height: 10),
-              const Text(
-                  "Audio playback is disabled to protect content. Please stop screen recording to continue.",
-                  style: TextStyle(color: Colors.white70, fontSize: 16),
-                  textAlign: TextAlign.center),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildPlayerControls(bool isNightMode, bool enableControls) {
+  Widget _buildPlayerControls(bool isNightMode) {
     final Color primaryTextColor = isNightMode ? Colors.white : Colors.black87;
     final Color secondaryTextColor =
         isNightMode ? Colors.white70 : Colors.grey[700]!;
@@ -613,7 +467,7 @@ class _AudioPlayerPageState extends State<AudioPlayerPage>
                 icon: const Icon(Icons.refresh, color: Colors.white),
                 label:
                     const Text('Retry', style: TextStyle(color: Colors.white)),
-                onPressed: enableControls ? _initAudioPlayer : null,
+                onPressed: _initAudioPlayer,
                 style: ElevatedButton.styleFrom(
                     backgroundColor: _playerPrimaryColor))
           ],
@@ -666,10 +520,8 @@ class _AudioPlayerPageState extends State<AudioPlayerPage>
                     value: position.inMilliseconds
                         .toDouble()
                         .clamp(0.0, duration.inMilliseconds.toDouble()),
-                    onChanged: enableControls
-                        ? (value) => _audioPlayer
-                            .seek(Duration(milliseconds: value.toInt()))
-                        : null,
+                    onChanged: (value) => _audioPlayer
+                        .seek(Duration(milliseconds: value.toInt())),
                   ),
                 ),
                 Padding(
@@ -698,32 +550,28 @@ class _AudioPlayerPageState extends State<AudioPlayerPage>
               icon: const Icon(Icons.replay_10_rounded),
               iconSize: 36,
               color: iconColor.withOpacity(0.8),
-              onPressed: enableControls
-                  ? () => _audioPlayer
-                      .seek(_audioPlayer.position - const Duration(seconds: 10))
-                  : null,
+              onPressed: () => _audioPlayer
+                  .seek(_audioPlayer.position - const Duration(seconds: 10)),
             ),
             const SizedBox(width: 32),
-            _buildPlayPauseButton(enableControls),
+            _buildPlayPauseButton(),
             const SizedBox(width: 32),
             IconButton(
               icon: const Icon(Icons.forward_10_rounded),
               iconSize: 36,
               color: iconColor.withOpacity(0.8),
-              onPressed: enableControls
-                  ? () => _audioPlayer
-                      .seek(_audioPlayer.position + const Duration(seconds: 10))
-                  : null,
+              onPressed: () => _audioPlayer
+                  .seek(_audioPlayer.position + const Duration(seconds: 10)),
             ),
           ],
         ),
         const SizedBox(height: 30),
-        _buildExtraControlsRow(isNightMode, enableControls),
+        _buildExtraControlsRow(isNightMode),
       ],
     );
   }
 
-  Widget _buildPlayPauseButton(bool enableControls) {
+  Widget _buildPlayPauseButton() {
     return StreamBuilder<PlayerState>(
       stream: _audioPlayer.playerStateStream,
       builder: (context, snapshot) {
@@ -755,25 +603,23 @@ class _AudioPlayerPageState extends State<AudioPlayerPage>
         return IconButton(
           iconSize: 80,
           icon: Icon(icon, color: _playerPrimaryColor),
-          onPressed: enableControls
-              ? () {
-                  if (isPlaying) {
-                    _audioPlayer.pause();
-                  } else {
-                    if (processingState == ProcessingState.completed ||
-                        _isCompleted) {
-                      _audioPlayer.seek(Duration.zero);
-                    }
-                    _audioPlayer.play();
-                  }
-                }
-              : null,
+          onPressed: () {
+            if (isPlaying) {
+              _audioPlayer.pause();
+            } else {
+              if (processingState == ProcessingState.completed ||
+                  _isCompleted) {
+                _audioPlayer.seek(Duration.zero);
+              }
+              _audioPlayer.play();
+            }
+          },
         );
       },
     );
   }
 
-  Widget _buildExtraControlsRow(bool isNightMode, bool enableControls) {
+  Widget _buildExtraControlsRow(bool isNightMode) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
       children: [
@@ -785,8 +631,7 @@ class _AudioPlayerPageState extends State<AudioPlayerPage>
             return _buildControlButton(
                 icon: Icons.speed_rounded,
                 label: speedText,
-                onPressed:
-                    enableControls ? () => _showSpeedMenu(context) : null,
+                onPressed: () => _showSpeedMenu(context),
                 isNightMode: isNightMode);
           },
         ),
@@ -805,8 +650,7 @@ class _AudioPlayerPageState extends State<AudioPlayerPage>
             return _buildControlButton(
                 icon: volumeIcon,
                 label: 'Volume',
-                onPressed:
-                    enableControls ? () => _showVolumeSlider(context) : null,
+                onPressed: () => _showVolumeSlider(context),
                 isNightMode: isNightMode);
           },
         ),
@@ -839,7 +683,6 @@ class _AudioPlayerPageState extends State<AudioPlayerPage>
   }
 
   void _showSpeedMenu(BuildContext context) {
-    if (Platform.isIOS && _isIOSScreenRecording) return;
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -928,7 +771,6 @@ class _AudioPlayerPageState extends State<AudioPlayerPage>
   }
 
   void _showVolumeSlider(BuildContext context) {
-    if (Platform.isIOS && _isIOSScreenRecording) return;
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,

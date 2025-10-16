@@ -12,7 +12,7 @@ import '../../theme_provider.dart'; // Adjust path if necessary
 
 // --- Screen Recording Prevention Imports ---
 import 'dart:io' show Platform;
-import '../../screen_capture_blocker.dart'; // Adjust path if necessary
+// Screen capture blocker functionality has been removed.
 
 const String _apiBaseUrl = "https://admin.basirahtv.com";
 
@@ -79,11 +79,6 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
   late Color _appBarTitleColor;
   late Color _primaryColor;
 
-  // --- Screen Recording State ---
-  bool _isIOSScreenRecording = false;
-  StreamSubscription<bool>? _iosScreenRecordingSubscription;
-  bool _hasShownRecordingDialog = false;
-
   @override
   void initState() {
     super.initState();
@@ -100,97 +95,6 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
       _updateThemeColors();
       _initializeVideoPlayer(_currentVideoUrl);
     });
-
-    if (Platform.isIOS) {
-      ScreenCaptureBlocker.isScreenBeingRecorded().then((isRecording) {
-        if (mounted) {
-          setState(() => _isIOSScreenRecording = isRecording);
-          if (isRecording) _handleIOSScreenRecordingChange(true);
-        }
-      });
-      _iosScreenRecordingSubscription = ScreenCaptureBlocker
-          .screenRecordingStatusStream
-          .listen(_handleIOSScreenRecordingChange, onError: (error) {
-        print(
-            "[VideoPlayerPage] Error listening to screen recording stream: $error");
-        if (mounted) setState(() => _isIOSScreenRecording = false);
-      });
-    }
-  }
-
-  // --- All original logic methods (_handleIOSScreenRecordingChange, _initializeVideoPlayer, _sendProgressUpdate, etc.) remain the same ---
-  // --- They are included below for completeness without modification to their logic ---
-
-  void _handleIOSScreenRecordingChange(bool isRecording) {
-    if (!mounted) return;
-    bool oldStatus = _isIOSScreenRecording;
-    setState(() => _isIOSScreenRecording = isRecording);
-
-    if (isRecording) {
-      print("[VideoPlayerPage] iOS screen recording detected! Pausing video.");
-      if (_controller.value.isInitialized && _controller.value.isPlaying) {
-        _controller.pause();
-      }
-      if (!_showControls) setState(() => _showControls = true);
-      _showScreenRecordingWarningDialog();
-    } else {
-      if (oldStatus == true && isRecording == false) {
-        print("[VideoPlayerPage] iOS screen recording stopped.");
-        if (!_isVideoInitialized && !_isLoading) {
-          print(
-              "[VideoPlayerPage] Attempting to initialize video after screen recording stopped.");
-          _initializeVideoPlayer(_currentVideoUrl);
-        }
-      }
-    }
-  }
-
-  void _showScreenRecordingWarningDialog() {
-    if (!mounted ||
-        !Platform.isIOS ||
-        !_isIOSScreenRecording ||
-        _hasShownRecordingDialog) return;
-    setState(() => _hasShownRecordingDialog = true);
-
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (BuildContext dialogContext) {
-        final themeProvider =
-            Provider.of<ThemeProvider>(context, listen: false);
-        final isNightMode = themeProvider.isDarkMode;
-        return AlertDialog(
-          backgroundColor: isNightMode ? const Color(0xFF1E2A3A) : Colors.white,
-          title: Text("Screen Recording Active",
-              style: TextStyle(
-                  color: isNightMode ? Colors.white : Colors.black87)),
-          content: Text(
-            "To protect our content, video playback is disabled while screen recording is active. Please stop recording to continue.",
-            style:
-                TextStyle(color: isNightMode ? Colors.white70 : Colors.black54),
-          ),
-          actions: <Widget>[
-            TextButton(
-              child: Text("OK", style: TextStyle(color: _primaryColor)),
-              onPressed: () {
-                Navigator.of(dialogContext).pop();
-                setState(() => _hasShownRecordingDialog = false);
-                ScreenCaptureBlocker.isScreenBeingRecorded()
-                    .then((isStillRecording) {
-                  if (mounted) {
-                    if (_isIOSScreenRecording && !isStillRecording) {
-                      _handleIOSScreenRecordingChange(false);
-                    } else {
-                      setState(() => _isIOSScreenRecording = isStillRecording);
-                    }
-                  }
-                });
-              },
-            ),
-          ],
-        );
-      },
-    );
   }
 
   void _updateThemeColors() {
@@ -233,14 +137,6 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
   }
 
   Future<void> _initializeVideoPlayer(String url) async {
-    if (Platform.isIOS && _isIOSScreenRecording) {
-      print(
-          "[VideoPlayerPage] iOS screen capture active, delaying video initialization.");
-      setState(() => _isLoading = false);
-      _showScreenRecordingWarningDialog();
-      return;
-    }
-
     setState(() {
       _isLoading = true;
       _isVideoInitialized = false;
@@ -256,18 +152,6 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
     try {
       await _controller.initialize();
       if (!mounted) return;
-
-      if (Platform.isIOS && _isIOSScreenRecording) {
-        print(
-            "[VideoPlayerPage] iOS screen capture became active during video initialization. Pausing.");
-        setState(() {
-          _isVideoInitialized = true;
-          _isLoading = false;
-        });
-        _controller.pause();
-        _showScreenRecordingWarningDialog();
-        return;
-      }
 
       setState(() {
         _isVideoInitialized = true;
@@ -289,14 +173,6 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
   void _videoPlayerListener() {
     if (!mounted || !_controller.value.isInitialized) return;
 
-    if (Platform.isIOS &&
-        _isIOSScreenRecording &&
-        _controller.value.isPlaying) {
-      _controller.pause();
-      _showScreenRecordingWarningDialog();
-      return;
-    }
-
     if (!_isDraggingProgress) {
       setState(() => _currentSliderValue =
           _controller.value.position.inMilliseconds.toDouble());
@@ -316,9 +192,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
     _progressUpdateTimer?.cancel();
     _progressUpdateTimer = Timer.periodic(const Duration(seconds: 15), (timer) {
       if (mounted && _isVideoInitialized && _controller.value.isPlaying) {
-        if (!(Platform.isIOS && _isIOSScreenRecording)) {
-          _sendProgressUpdate();
-        }
+        _sendProgressUpdate();
       } else {
         timer.cancel();
       }
@@ -328,7 +202,6 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
   Future<void> _sendProgressUpdate({bool isCompleted = false}) async {
     if (!mounted || !_isVideoInitialized || (_isCompleted && isCompleted))
       return;
-    if (Platform.isIOS && _isIOSScreenRecording && !isCompleted) return;
 
     final phoneNumber = await _getPhoneNumber();
     if (phoneNumber == null) return;
@@ -373,17 +246,11 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
       setState(() => _isCompleted = true);
       _sendProgressUpdate(isCompleted: true);
       _progressUpdateTimer?.cancel();
-      if (!(Platform.isIOS && _isIOSScreenRecording)) {
-        _playNextEpisode();
-      }
+      _playNextEpisode();
     }
   }
 
   void _playNextEpisode() {
-    if (Platform.isIOS && _isIOSScreenRecording) {
-      _showScreenRecordingWarningDialog();
-      return;
-    }
     final currentIndex = widget.otherEpisodes.indexWhere(
         (ep) => int.tryParse(ep['id'] ?? '-1') == _currentEpisodeId);
     if (currentIndex != -1 && currentIndex < widget.otherEpisodes.length - 1) {
@@ -394,10 +261,6 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
   }
 
   void _playPreviousEpisode() {
-    if (Platform.isIOS && _isIOSScreenRecording) {
-      _showScreenRecordingWarningDialog();
-      return;
-    }
     final currentIndex = widget.otherEpisodes.indexWhere(
         (ep) => int.tryParse(ep['id'] ?? '-1') == _currentEpisodeId);
     if (currentIndex > 0) {
@@ -411,7 +274,6 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    _iosScreenRecordingSubscription?.cancel();
     _progressUpdateTimer?.cancel();
     _hideControlsTimer?.cancel();
     _seekAnimationTimer?.cancel();
@@ -420,9 +282,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
         _isVideoInitialized &&
         !_isCompleted &&
         _controller.value.position > Duration.zero) {
-      if (!(Platform.isIOS && _isIOSScreenRecording)) {
-        _sendProgressUpdate();
-      }
+      _sendProgressUpdate();
     }
 
     _controller.removeListener(_videoPlayerListener);
@@ -443,17 +303,11 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
         _isVideoInitialized &&
         _controller.value.isPlaying) {
       _controller.pause();
-      if (!(Platform.isIOS && _isIOSScreenRecording)) {
-        _sendProgressUpdate();
-      }
+      _sendProgressUpdate();
     }
   }
 
   void _toggleFullScreen() {
-    if (Platform.isIOS && _isIOSScreenRecording) {
-      _showScreenRecordingWarningDialog();
-      return;
-    }
     setState(() => _isFullScreen = !_isFullScreen);
     if (_isFullScreen) {
       SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
@@ -472,11 +326,6 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
   }
 
   void _togglePlayPause() {
-    if (Platform.isIOS && _isIOSScreenRecording) {
-      _showScreenRecordingWarningDialog();
-      if (_controller.value.isPlaying) _controller.pause();
-      return;
-    }
     if (!_isVideoInitialized) return;
     setState(() {
       if (_controller.value.isPlaying) {
@@ -498,10 +347,6 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
   void _startHideControlsTimer() {
     _hideControlsTimer?.cancel();
     if (_controller.value.isPlaying && !_isDraggingProgress) {
-      if (Platform.isIOS && _isIOSScreenRecording) {
-        if (mounted && !_showControls) setState(() => _showControls = true);
-        return;
-      }
       _hideControlsTimer = Timer(const Duration(seconds: 4), () {
         if (mounted && _controller.value.isPlaying && !_isDraggingProgress) {
           setState(() => _showControls = false);
@@ -516,11 +361,6 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
 
   void _toggleControlsVisibility() {
     if (!_isVideoInitialized) return;
-    if (Platform.isIOS && _isIOSScreenRecording) {
-      if (mounted && !_showControls) setState(() => _showControls = true);
-      _showScreenRecordingWarningDialog();
-      return;
-    }
     setState(() => _showControls = !_showControls);
     if (_showControls)
       _startHideControlsTimer();
@@ -529,10 +369,6 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
   }
 
   void _changeEpisode(Map<String, String> newEpisodeData) {
-    if (Platform.isIOS && _isIOSScreenRecording) {
-      _showScreenRecordingWarningDialog();
-      return;
-    }
     final String? newUrlPath = newEpisodeData['video_path'] ??
         newEpisodeData['video'] ??
         newEpisodeData['videoUrl'] ??
@@ -577,10 +413,6 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
   }
 
   void _seekRelative(Duration offset) {
-    if (Platform.isIOS && _isIOSScreenRecording) {
-      _showScreenRecordingWarningDialog();
-      return;
-    }
     if (!_isVideoInitialized) return;
     final currentPosition = _controller.value.position;
     var newPosition = currentPosition + offset;
@@ -599,14 +431,13 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
 
   void _showSeekAnimation(bool isForward) {
     if (!mounted) return;
-    if (Platform.isIOS && _isIOSScreenRecording) return;
     setState(() {
       _seekAnimationType = isForward ? 'forward' : 'backward';
       _seekAnimationVisible = true;
     });
     _seekAnimationTimer?.cancel();
     _seekAnimationTimer = Timer(const Duration(milliseconds: 600), () {
-      if (!mounted) setState(() => _seekAnimationVisible = false);
+      if (mounted) setState(() => _seekAnimationVisible = false);
     });
   }
 
@@ -641,8 +472,6 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
   @override
   Widget build(BuildContext context) {
     _updateThemeColors();
-    final bool hideAppBarDueToRecording =
-        Platform.isIOS && _isIOSScreenRecording;
 
     return WillPopScope(
       onWillPop: () async {
@@ -653,7 +482,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
         return true;
       },
       child: Scaffold(
-        appBar: _isFullScreen || hideAppBarDueToRecording
+        appBar: _isFullScreen
             ? null
             : AppBar(
                 title: Text(_currentEpisodeTitle,
@@ -719,9 +548,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
 
   Widget _buildVideoPlayerArea() {
     Widget videoRenderWidget;
-    if (Platform.isIOS && _isIOSScreenRecording) {
-      videoRenderWidget = _buildScreenRecordingOverlay();
-    } else if (_isVideoInitialized &&
+    if (_isVideoInitialized &&
         _controller.value.isInitialized &&
         _controller.value.size.width > 0) {
       if (_isFullScreen) {
@@ -751,21 +578,15 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
       );
     }
 
-    final bool enablePlayerInteractions =
-        !(Platform.isIOS && _isIOSScreenRecording);
-
     final List<Widget> stackChildren = [
       videoRenderWidget,
       GestureDetector(
-        onTap: enablePlayerInteractions ? _toggleControlsVisibility : null,
+        onTap: _toggleControlsVisibility,
         onDoubleTapDown: (details) {
-          if (enablePlayerInteractions)
-            _tapDownPosition = details.localPosition;
+          _tapDownPosition = details.localPosition;
         },
         onDoubleTap: () {
-          if (!enablePlayerInteractions ||
-              _tapDownPosition == null ||
-              !_isVideoInitialized) return;
+          if (_tapDownPosition == null || !_isVideoInitialized) return;
           final RenderBox? renderBox = context.findRenderObject() as RenderBox?;
           if (renderBox == null) return;
           final playerWidgetSize = renderBox.size;
@@ -784,11 +605,8 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
         behavior: HitTestBehavior.opaque,
         child: Container(color: Colors.transparent),
       ),
-      if (_isVideoInitialized && enablePlayerInteractions)
-        _buildControlsOverlay(),
-      if (_seekAnimationVisible &&
-          _seekAnimationType != null &&
-          enablePlayerInteractions)
+      if (_isVideoInitialized) _buildControlsOverlay(),
+      if (_seekAnimationVisible && _seekAnimationType != null)
         Center(
           child: AnimatedOpacity(
             opacity: _seekAnimationVisible ? 1.0 : 0.0,
@@ -829,37 +647,6 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
     }
   }
 
-  // --- UI ENHANCEMENT: New Screen Recording Overlay ---
-  Widget _buildScreenRecordingOverlay() {
-    return Container(
-      color: Colors.black,
-      alignment: Alignment.center,
-      child: Padding(
-        padding: const EdgeInsets.all(30.0),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.videocam_off_outlined,
-                color: Colors.yellow.shade700, size: 50),
-            const SizedBox(height: 20),
-            const Text("Playback Disabled",
-                style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold),
-                textAlign: TextAlign.center),
-            const SizedBox(height: 10),
-            const Text(
-                "Screen recording is active. Please stop recording to watch the video.",
-                style: TextStyle(color: Colors.white70, fontSize: 16),
-                textAlign: TextAlign.center),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // --- All other control overlays (_buildControlsOverlay, _buildTopControls, etc.) remain unchanged ---
   Widget _buildControlsOverlay() {
     final bool shouldShowActualControls = _showControls ||
         !_controller.value.isPlaying ||
@@ -1028,25 +815,19 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
                               _controller.value.duration.inMilliseconds > 0
                           ? _controller.value.duration.inMilliseconds.toDouble()
                           : 1.0,
-                      onChangeStart: (Platform.isIOS && _isIOSScreenRecording)
-                          ? null
-                          : (value) {
-                              setState(() => _isDraggingProgress = true);
-                              _hideControlsTimer?.cancel();
-                            },
-                      onChangeEnd: (Platform.isIOS && _isIOSScreenRecording)
-                          ? null
-                          : (value) {
-                              _controller.seekTo(
-                                  Duration(milliseconds: value.toInt()));
-                              setState(() => _isDraggingProgress = false);
-                              _startHideControlsTimer();
-                            },
-                      onChanged: (Platform.isIOS && _isIOSScreenRecording)
-                          ? null
-                          : (value) {
-                              setState(() => _currentSliderValue = value);
-                            },
+                      onChangeStart: (value) {
+                        setState(() => _isDraggingProgress = true);
+                        _hideControlsTimer?.cancel();
+                      },
+                      onChangeEnd: (value) {
+                        _controller
+                            .seekTo(Duration(milliseconds: value.toInt()));
+                        setState(() => _isDraggingProgress = false);
+                        _startHideControlsTimer();
+                      },
+                      onChanged: (value) {
+                        setState(() => _currentSliderValue = value);
+                      },
                     ),
                   ),
                 ),
@@ -1073,8 +854,6 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
     );
   }
 
-  // --- UI ENHANCEMENT: Replaced old info/playlist widgets with these new ones ---
-
   Widget _buildVideoInfo() {
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 20, 16, 12),
@@ -1091,7 +870,6 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
   Widget _buildPlaylist() {
     final playlistItems = widget.otherEpisodes;
     if (playlistItems.isEmpty) return const SizedBox.shrink();
-    final bool enablePlaylistTap = !(Platform.isIOS && _isIOSScreenRecording);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1116,15 +894,14 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
           padding: EdgeInsets.zero,
           physics: const NeverScrollableScrollPhysics(),
           itemCount: playlistItems.length,
-          itemBuilder: (context, index) => _buildPlaylistItem(
-              playlistItems[index], index, enablePlaylistTap),
+          itemBuilder: (context, index) =>
+              _buildPlaylistItem(playlistItems[index], index),
         ),
       ],
     );
   }
 
-  Widget _buildPlaylistItem(
-      Map<String, String> episode, int index, bool enableTap) {
+  Widget _buildPlaylistItem(Map<String, String> episode, int index) {
     final int? episodeId = int.tryParse(episode['id'] ?? '');
     final bool isCurrent = episodeId != null && episodeId == _currentEpisodeId;
     final String thumbnailUrl = episode['thumbnail'] ?? episode['image'] ?? '';
@@ -1144,7 +921,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
     return Material(
       color: itemBgColor,
       child: InkWell(
-        onTap: isCurrent || !enableTap ? null : () => _changeEpisode(episode),
+        onTap: isCurrent ? null : () => _changeEpisode(episode),
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 16.0),
           decoration: BoxDecoration(
@@ -1174,8 +951,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
                   ),
                   if (isCurrent &&
                       _isVideoInitialized &&
-                      !_controller.value.isBuffering &&
-                      enableTap)
+                      !_controller.value.isBuffering)
                     Positioned.fill(
                       child: Container(
                         decoration: BoxDecoration(

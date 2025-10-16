@@ -1,4 +1,4 @@
-// lib/topbar/terms_and_agreement_page.dart
+// lib/topbar/privacy_policy_page.dart
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -21,14 +21,14 @@ class AppContent {
   }
 }
 
-class TermsAndAgreementPage extends StatefulWidget {
-  const TermsAndAgreementPage({super.key});
+class PrivacyPolicyPage extends StatefulWidget {
+  const PrivacyPolicyPage({Key? key}) : super(key: key);
 
   @override
-  State<TermsAndAgreementPage> createState() => _TermsAndAgreementPageState();
+  State<PrivacyPolicyPage> createState() => _PrivacyPolicyPageState();
 }
 
-class _TermsAndAgreementPageState extends State<TermsAndAgreementPage> {
+class _PrivacyPolicyPageState extends State<PrivacyPolicyPage> {
   late Future<AppContent> _futureContent;
 
   @override
@@ -39,7 +39,7 @@ class _TermsAndAgreementPageState extends State<TermsAndAgreementPage> {
 
   Future<AppContent> _fetchContent() async {
     // IMPORTANT: Replace with your actual API URL
-    const String apiUrl = 'https://admin.basirahtv.com/api/terms-and-agreement';
+    const String apiUrl = 'https://admin.basirahtv.com/api/privacy-policy';
 
     try {
       final response = await http.get(Uri.parse(apiUrl));
@@ -65,8 +65,8 @@ class _TermsAndAgreementPageState extends State<TermsAndAgreementPage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Terms and Agreement',
-            style: TextStyle(color: Colors.white)),
+        title:
+            const Text('Privacy Policy', style: TextStyle(color: Colors.white)),
         backgroundColor: appBarColor,
         iconTheme: const IconThemeData(color: Colors.white),
       ),

@@ -1,5 +1,3 @@
-// lib/topbar/login_page.dart
-
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
@@ -26,7 +24,6 @@ class _LoginPageState extends State<LoginPage> {
   bool _isPasswordVisible = false;
   final DeviceInfoService _deviceInfoService = DeviceInfoService();
 
-  // --- THIS IS THE UPDATED LOGIN FUNCTION ---
   Future<void> _login() async {
     if (_isLoading) return;
 
@@ -39,6 +36,10 @@ class _LoginPageState extends State<LoginPage> {
     }
 
     setState(() => _isLoading = true);
+
+    // Using a local variable for the navigator is safer with async gaps
+    final navigator = Navigator.of(context);
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
 
     String deviceId = "unknown_device_id";
     String deviceName = "Unknown Device";
@@ -75,23 +76,25 @@ class _LoginPageState extends State<LoginPage> {
         final Map<String, dynamic>? userData = responseData['user'];
 
         if (token != null && userData != null) {
-          Provider.of<AuthProvider>(context, listen: false)
-              .login(token, userData);
+          authProvider.login(token, userData);
 
           SharedPreferences prefs = await SharedPreferences.getInstance();
-          await prefs.setString('userName',
-              '${userData['first_name'] ?? ''} ${userData['last_name'] ?? ''}');
           await prefs.setString('current_session_device_id', deviceId);
 
           print("Login successful.");
           fcm.updateAndSendFcmToken();
 
-          _showNotification('Login successful', Colors.green);
-
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(builder: (context) => MainScreen()),
+          // --- THIS IS THE FIX ---
+          // DO NOT show a notification here. Instead, pass the message
+          // to the MainScreen, which will show it safely.
+          await navigator.pushReplacement(
+            MaterialPageRoute(
+              builder: (context) => const MainScreen(
+                postLoginMessage: 'Login successful! Welcome back.',
+              ),
+            ),
           );
+          // -----------------------
         } else {
           _showNotification(
               'Login failed: Invalid server response.', Colors.redAccent);
@@ -99,8 +102,6 @@ class _LoginPageState extends State<LoginPage> {
       } else if (response.statusCode == 401) {
         _showNotification(
             'Invalid phone number or password.', Colors.redAccent);
-        // --- THIS IS THE FIX ---
-        // Handle the new "Device Limit Reached" error from the backend.
       } else if (response.statusCode == 403) {
         final message = responseData['message'] ??
             'Device limit reached. Please log out from another device.';
@@ -122,6 +123,8 @@ class _LoginPageState extends State<LoginPage> {
     }
   }
 
+  // This function is now only used for showing ERRORS, which is safe
+  // because we don't navigate away after an error.
   void _showNotification(String message, Color color) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).removeCurrentSnackBar();
@@ -136,8 +139,7 @@ class _LoginPageState extends State<LoginPage> {
         margin: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 100.0),
         shape:
             RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.0)),
-        duration:
-            const Duration(seconds: 4), // Increased duration for readability
+        duration: const Duration(seconds: 4),
       ),
     );
   }
@@ -170,7 +172,6 @@ class _LoginPageState extends State<LoginPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            // --- MODIFIED: Increased logo size ---
             Image.asset('assets/images/logo.png', width: 150, height: 150),
             const SizedBox(height: 30),
             Align(
