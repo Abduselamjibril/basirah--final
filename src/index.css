@@ -1,0 +1,67 @@
+@import url("https://fonts.googleapis.com/css2?family=Source+Sans+Pro:wght@400;600;700&display=swap");
+
+/* Set base properties for the document */
+html,
+body,
+#root,
+.app {
+  height: 100%;
+  width: 100%;
+  font-family: "Source Sans Pro", sans-serif;
+  margin: 0;
+  padding: 0;
+}
+
+.app {
+  display: flex;
+  position: relative;
+  min-height: 100%;
+}
+
+.sidebar-wrapper {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+}
+
+.content {
+  flex: 1;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Updated Scrollbar styles for new theme */
+::-webkit-scrollbar {
+  width: 10px;
+}
+
+/* Track */
+::-webkit-scrollbar-track {
+  background: #02132b; /* Matches dark theme background */
+}
+
+/* Handle */
+::-webkit-scrollbar-thumb {
+  background: #25375a; /* Matches dark theme primary color */
+  border-radius: 5px;
+}
+
+/* Handle on hover */
+::-webkit-scrollbar-thumb:hover {
+  background: #515f7b; /* Lighter shade on hover */
+}
+/* --- CSS Rules for Printing the Payouts Report --- */
+
+@media print {
+  /* Hide the entire application by default when printing */
+  body > #root > .app {
+    display: none;
+  }
+
+  /* Make the hidden printable area visible ONLY when printing */
+  #printable-area {
+    display: block !important;
+  }
+}
