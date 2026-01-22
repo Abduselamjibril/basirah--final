@@ -234,7 +234,7 @@ class _ProfileOptions extends StatelessWidget {
           Divider(color: colors.divider, height: 1, indent: 68, endIndent: 16),
           _ProfileOptionTile(
               icon: Icons.info_outline_rounded,
-              title: 'About Basirah',
+              title: 'About Basirah TV',
               onTap: () => Navigator.push(context,
                   MaterialPageRoute(builder: (_) => const AboutPage())),
               iconColor: colors.primary,

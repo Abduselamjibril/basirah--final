@@ -32,7 +32,17 @@ class PlaylistDetailPage extends StatefulWidget {
   _PlaylistDetailPageState createState() => _PlaylistDetailPageState();
 }
 
+class _PlaylistDetailCacheEntry {
+  final Playlist playlist;
+  final bool isUserPremium;
+  const _PlaylistDetailCacheEntry({
+    required this.playlist,
+    required this.isUserPremium,
+  });
+}
+
 class _PlaylistDetailPageState extends State<PlaylistDetailPage> {
+  static final Map<int, _PlaylistDetailCacheEntry> _cache = {};
   Playlist? _playlist;
   bool _isLoading = true;
   String? _errorMessage;
@@ -62,6 +72,16 @@ class _PlaylistDetailPageState extends State<PlaylistDetailPage> {
 
   Future<void> _initialize() async {
     if (!context.mounted) return;
+    final cached = _cache[widget.playlistId];
+    if (cached != null) {
+      setState(() {
+        _playlist = cached.playlist;
+        _isUserPremium = cached.isUserPremium;
+        _isLoading = false;
+        _errorMessage = null;
+      });
+      return;
+    }
     final token = Provider.of<AuthProvider>(context, listen: false).token;
     if (token == null) {
       setState(() {
@@ -76,6 +96,13 @@ class _PlaylistDetailPageState extends State<PlaylistDetailPage> {
       final playlistFuture = _fetchPlaylistDetails(token);
       _isUserPremium = await premiumFuture;
       await playlistFuture;
+      final playlistSnapshot = _playlist;
+      if (playlistSnapshot != null) {
+        _cache[widget.playlistId] = _PlaylistDetailCacheEntry(
+          playlist: playlistSnapshot,
+          isUserPremium: _isUserPremium,
+        );
+      }
     } catch (e) {
       if (context.mounted) {
         setState(() => _errorMessage = "An error occurred. Please try again.");
@@ -100,6 +127,10 @@ class _PlaylistDetailPageState extends State<PlaylistDetailPage> {
       );
       if (context.mounted) {
         setState(() => _playlist = playlist);
+        _cache[widget.playlistId] = _PlaylistDetailCacheEntry(
+          playlist: playlist,
+          isUserPremium: _isUserPremium,
+        );
       }
     } catch (e) {
       if (!context.mounted) return;
@@ -123,6 +154,10 @@ class _PlaylistDetailPageState extends State<PlaylistDetailPage> {
     final indexToRemove = _playlist!.items!.indexOf(itemToRemove);
     if (indexToRemove == -1) return;
     setState(() => _playlist!.items!.removeAt(indexToRemove));
+    _cache[widget.playlistId] = _PlaylistDetailCacheEntry(
+      playlist: _playlist!,
+      isUserPremium: _isUserPremium,
+    );
     try {
       await _playlistService.removeEpisodeFromPlaylist(
         playlistId: widget.playlistId,
@@ -138,6 +173,10 @@ class _PlaylistDetailPageState extends State<PlaylistDetailPage> {
         return;
       }
       setState(() => _playlist!.items!.insert(indexToRemove, itemToRemove));
+      _cache[widget.playlistId] = _PlaylistDetailCacheEntry(
+        playlist: _playlist!,
+        isUserPremium: _isUserPremium,
+      );
       _uiService
           .showErrorSnackbar('Failed to remove episode. Please try again.');
     }

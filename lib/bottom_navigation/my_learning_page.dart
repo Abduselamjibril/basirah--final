@@ -5,6 +5,8 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:provider/provider.dart';
 import 'package:logger/logger.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 
 // Import Detail Pages
 import '../course/course_detail_page.dart';
@@ -52,6 +54,9 @@ class _MyLearningPageState extends State<MyLearningPage> {
   String? _phoneNumber;
   final GlobalKey<RefreshIndicatorState> _refreshIndicatorKey =
       GlobalKey<RefreshIndicatorState>();
+  bool _prefetchedInProgress = false;
+  bool _prefetchedCompleted = false;
+  final DefaultCacheManager _cacheManager = DefaultCacheManager();
 
   @override
   void initState() {
@@ -145,6 +150,13 @@ class _MyLearningPageState extends State<MyLearningPage> {
               _isError = false;
             });
           }
+          // Warm image caches for both tabs once.
+          _prefetchListImages(_inProgressContent, markPrefetched: () {
+            _prefetchedInProgress = true;
+          }, alreadyPrefetched: _prefetchedInProgress);
+          _prefetchListImages(_completedContent, markPrefetched: () {
+            _prefetchedCompleted = true;
+          }, alreadyPrefetched: _prefetchedCompleted);
           _logger.d(
               'Loaded ${_inProgressContent.length} in-progress items and ${_completedContent.length} completed items');
         } catch (e, stackTrace) {
@@ -204,6 +216,39 @@ class _MyLearningPageState extends State<MyLearningPage> {
       return parsedId != null && parsedId > 0;
     }
     return false;
+  }
+
+  void _prefetchListImages(List<dynamic> items,
+      {int limit = 20,
+      required void Function() markPrefetched,
+      bool alreadyPrefetched = false}) {
+    if (alreadyPrefetched) return;
+    final urls = <String>[];
+    for (final item in items) {
+      if (item is! Map<String, dynamic>) continue;
+      final contentType = (item['content_type']?.toString() ?? '').toLowerCase();
+      final imagePath = item['image_path']?.toString();
+      final imageUrlFromApi = item['image_url']?.toString();
+      String? url;
+      if (imagePath != null && imagePath.isNotEmpty) {
+        url = (contentType == 'course' || !imagePath.startsWith('http'))
+            ? "https://admin.basirahtv.com/storage/" + imagePath
+            : imagePath;
+      } else if (imageUrlFromApi != null && imageUrlFromApi.isNotEmpty) {
+        url = imageUrlFromApi;
+      }
+      if (url != null && url.isNotEmpty) urls.add(url);
+      if (urls.length >= limit) break;
+    }
+    if (urls.isEmpty) return;
+    markPrefetched();
+    for (final url in urls) {
+      unawaited(_cacheManager.getFileFromCache(url).then((cached) async {
+        if (cached == null) {
+          await _cacheManager.downloadFile(url);
+        }
+      }).catchError((_) {}));
+    }
   }
 
   String _getErrorMessageFromStatusCode(int statusCode, String responseBody) {
@@ -609,26 +654,25 @@ class _MyLearningPageState extends State<MyLearningPage> {
                 child: displayImageUrl != null && displayImageUrl.isNotEmpty
                     ? ClipRRect(
                         borderRadius: BorderRadius.circular(8),
-                        child: Image.network(
-                          displayImageUrl,
-                          width: 70,
-                          height: 70,
-                          fit: BoxFit.cover,
-                          errorBuilder: (ctx, err, st) {
-                            _logger.e('Failed img load: $displayImageUrl', err);
-                            return Center(
-                                child: Icon(typeIcon,
-                                    size: 36,
-                                    color: subTextColor.withOpacity(0.8)));
-                          },
-                          loadingBuilder: (ctx, child, prog) => prog == null
-                              ? child
-                              : Center(
-                                  child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      valueColor: AlwaysStoppedAnimation<Color>(
-                                          primaryColor))),
-                        ),
+                    child: CachedNetworkImage(
+                      imageUrl: displayImageUrl,
+                      width: 70,
+                      height: 70,
+                      fit: BoxFit.cover,
+                      cacheManager: _cacheManager,
+                      placeholder: (ctx, url) => Center(
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            primaryColor))),
+                      errorWidget: (ctx, url, err) {
+                      _logger.e('Failed img load: $displayImageUrl', err);
+                      return Center(
+                        child: Icon(typeIcon,
+                          size: 36,
+                          color: subTextColor.withOpacity(0.8)));
+                      },
+                    ),
                       )
                     : Center(
                         child: Icon(typeIcon,

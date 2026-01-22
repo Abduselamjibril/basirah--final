@@ -13,7 +13,8 @@ class PlaylistsTab extends StatefulWidget {
   _PlaylistsTabState createState() => _PlaylistsTabState();
 }
 
-class _PlaylistsTabState extends State<PlaylistsTab> {
+class _PlaylistsTabState extends State<PlaylistsTab>
+  with AutomaticKeepAliveClientMixin<PlaylistsTab> {
   // Use the new strongly-typed model
   List<Playlist> _playlists = [];
   List<Playlist> _filteredPlaylists = [];
@@ -220,6 +221,7 @@ class _PlaylistsTabState extends State<PlaylistsTab> {
 
   @override
   Widget build(BuildContext context) {
+    super.build(context); // Ensure keep-alive works
     final themeProvider = Provider.of<ThemeProvider>(context);
     final authProvider = Provider.of<AuthProvider>(context);
     final isNightMode = themeProvider.isDarkMode;
@@ -286,6 +288,9 @@ class _PlaylistsTabState extends State<PlaylistsTab> {
           : null,
     );
   }
+
+  @override
+  bool get wantKeepAlive => true;
 
   // Updated to use the Playlist model
   Widget _buildPlaylistCard(Playlist playlist) {

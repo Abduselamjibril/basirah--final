@@ -1,12 +1,16 @@
+import 'dart:async' show unawaited;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:logger/logger.dart'; // --- LOGGER --- Import logger
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import 'Story_Detail_Page.dart'; // Corrected filename to match convention
 import '../../theme_provider.dart';
 // --- NEW IMPORTS ---
 import '../services/bookmark_service.dart'; // Using the new unified service
 import '../services/content_services/data_fetcher.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/content_cache_provider.dart';
 
 class StoryNightPage extends StatefulWidget {
   const StoryNightPage({super.key});
@@ -23,6 +27,8 @@ class _StoryNightPageState extends State<StoryNightPage> {
   bool isLoading = true;
   String? errorMessage;
   TextEditingController searchController = TextEditingController();
+  bool _imagesPrefetched = false;
+  final DefaultCacheManager _cacheManager = DefaultCacheManager();
 
   final _logger = Logger(); // --- LOGGER --- Initialize the logger
 
@@ -57,6 +63,22 @@ class _StoryNightPageState extends State<StoryNightPage> {
     if (!mounted) return;
     _logger
         .i("Fetching stories... forceRefresh: $forceRefresh"); // --- LOGGER ---
+    final cacheProvider =
+        Provider.of<ContentCacheProvider>(context, listen: false);
+
+    if (!forceRefresh && cacheProvider.hasData('stories')) {
+      final cached = cacheProvider.getData('stories');
+      setState(() {
+        stories = cached;
+        filteredStories = cached;
+        isLoading = false;
+        errorMessage = null;
+      });
+      _prefetchImages(cached);
+      _filterStories();
+      return;
+    }
+
     setState(() {
       isLoading = true;
       if (forceRefresh) errorMessage = null;
@@ -112,6 +134,9 @@ class _StoryNightPageState extends State<StoryNightPage> {
         isLoading = false;
         _filterStories();
       });
+
+      cacheProvider.setData('stories', stories);
+      _prefetchImages(stories);
       // --- LOGGER ---
       _logger.i(
           "Successfully fetched ${stories.length} stories and ${bookmarks.length} story bookmarks.");
@@ -193,6 +218,23 @@ class _StoryNightPageState extends State<StoryNightPage> {
         margin: const EdgeInsets.all(16),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         duration: const Duration(seconds: 3)));
+  }
+
+  void _prefetchImages(List<dynamic> items, {int limit = 12}) {
+    if (_imagesPrefetched) return;
+    _imagesPrefetched = true;
+    final urls = items
+        .map((e) => e['image']?.toString())
+        .where((u) => u != null && u.isNotEmpty)
+        .take(limit)
+        .toList();
+    for (final url in urls) {
+      unawaited(_cacheManager.getFileFromCache(url!).then((cached) async {
+        if (cached == null) {
+          await _cacheManager.downloadFile(url);
+        }
+      }).catchError((_) {}));
+    }
   }
 
   @override
@@ -342,20 +384,16 @@ class _StoryNightPageState extends State<StoryNightPage> {
                     width: double.infinity,
                     color: isNightMode ? Colors.grey[800] : Colors.grey[300],
                     child: hasImage
-                        ? Image.network(
-                            imageUrl,
-                            fit: BoxFit.fill,
-                            loadingBuilder: (context, child, progress) =>
-                                progress == null
-                                    ? child
-                                    : Center(
-                                        child: CircularProgressIndicator(
-                                            strokeWidth: 2)),
-                            errorBuilder: (context, error, stackTrace) =>
-                                Center(
-                                    child: Icon(Icons.broken_image_outlined,
-                                        color: Colors.grey[500])),
-                          )
+                      ? CachedNetworkImage(
+                        imageUrl: imageUrl,
+                        fit: BoxFit.fill,
+                        placeholder: (context, url) => const Center(
+                          child:
+                            CircularProgressIndicator(strokeWidth: 2)),
+                        errorWidget: (context, url, error) => Center(
+                          child: Icon(Icons.broken_image_outlined,
+                            color: Colors.grey[500])),
+                        )
                         : Center(
                             child: Icon(Icons.image_not_supported_outlined,
                                 color: Colors.grey[500])),

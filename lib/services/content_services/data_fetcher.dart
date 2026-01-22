@@ -40,6 +40,11 @@ Future<Map<String, dynamic>> fetchAndCacheContent({
     // Error reading from cache, will proceed to fetch from network.
   }
 
+  // If we already have cached data and are not forcing a refresh, return it without hitting the network.
+  if (data != null && !forceRefresh) {
+    return {'data': data, 'error': null};
+  }
+
   // 2. Fetch from network
   try {
     final response = await http.get(

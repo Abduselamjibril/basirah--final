@@ -7,6 +7,7 @@ import '../../theme_provider.dart';
 import '../services/bookmark_service.dart'; // Using the new unified service
 import '../services/content_services/data_fetcher.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/content_cache_provider.dart';
 
 class SurahPage extends StatefulWidget {
   const SurahPage({super.key});
@@ -37,6 +38,20 @@ class _SurahPageState extends State<SurahPage> {
   Future<void> _fetchData({bool forceRefresh = false}) async {
     if (!mounted) return;
     _logger.i("Fetching data... forceRefresh: $forceRefresh"); // --- LOGGER ---
+    final cacheProvider =
+        Provider.of<ContentCacheProvider>(context, listen: false);
+
+    // Quick return with cached surahs.
+    if (!forceRefresh && cacheProvider.hasData('surahs')) {
+      final cached = cacheProvider.getData('surahs');
+      setState(() {
+        surahs = cached;
+        lastError = null;
+        isLoading = false;
+      });
+      return;
+    }
+
     setState(() {
       isLoading = true;
       if (forceRefresh) lastError = null;
@@ -89,6 +104,9 @@ class _SurahPageState extends State<SurahPage> {
         };
         isLoading = false;
       });
+
+      // Cache for reuse.
+      cacheProvider.setData('surahs', surahs);
       // --- LOGGER ---
       _logger.i(
           "Successfully fetched ${surahs.length} surahs and ${bookmarks.length} bookmarks.");

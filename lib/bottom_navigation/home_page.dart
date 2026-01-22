@@ -1,6 +1,8 @@
+import 'dart:async' show unawaited;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'dart:async';
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 
 // Your Imports
 import '../theme_provider.dart';
@@ -26,6 +28,8 @@ class _HomePageState extends State<HomePage> {
 
   String searchQuery = '';
   final TextEditingController _searchController = TextEditingController();
+  bool _heroImagesPrefetched = false;
+  final DefaultCacheManager _cacheManager = DefaultCacheManager();
 
   // --- initState is now much simpler ---
   @override
@@ -76,6 +80,21 @@ class _HomePageState extends State<HomePage> {
       }
       return false;
     }).toList();
+  }
+
+  void _prefetchHeroImages(List<dynamic> items, {int limit = 24}) {
+    final urls = items
+        .map((e) => e is Map ? (e['image_path'] ?? e['image'])?.toString() : null)
+        .where((u) => u != null && u.isNotEmpty)
+        .take(limit)
+        .toList();
+    for (final url in urls) {
+      unawaited(_cacheManager.getFileFromCache(url!).then((cached) async {
+        if (cached == null) {
+          await _cacheManager.downloadFile(url);
+        }
+      }).catchError((_) {}));
+    }
   }
 
   @override
@@ -130,6 +149,23 @@ class _HomePageState extends State<HomePage> {
         filterContent(contentCache.deeperLooks, searchQuery);
     final filteredCommentaries =
         filterContent(contentCache.commentaries, searchQuery);
+
+    // Warm image cache once using top items from all sections to avoid reload flicker on scroll.
+    if (!_heroImagesPrefetched &&
+        (filteredCourses.isNotEmpty ||
+            filteredSurahs.isNotEmpty ||
+            filteredStories.isNotEmpty ||
+            filteredDeeperLooks.isNotEmpty ||
+            filteredCommentaries.isNotEmpty)) {
+      _heroImagesPrefetched = true;
+      _prefetchHeroImages([
+        ...filteredCourses,
+        ...filteredSurahs,
+        ...filteredStories,
+        ...filteredDeeperLooks,
+        ...filteredCommentaries,
+      ]);
+    }
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
@@ -188,7 +224,7 @@ class _HomePageState extends State<HomePage> {
                         mainAxisAlignment: MainAxisAlignment.center,
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text('Basirah',
+                            const Text('Basirah TV',
                               style: TextStyle(
                                   color: Colors.white,
                                   fontSize: 32.0,
@@ -428,7 +464,7 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  Widget _buildContentCard(
+    Widget _buildContentCard(
       {required Map<String, dynamic> item,
       required bool isNightMode,
       required bool isUserPremium}) {
@@ -458,34 +494,29 @@ class _HomePageState extends State<HomePage> {
               children: [
                 ClipRRect(
                   borderRadius:
-                      const BorderRadius.vertical(top: Radius.circular(16.0)),
-                  child: Image.network(
-                    imageUrl ?? '',
+                    const BorderRadius.vertical(top: Radius.circular(16.0)),
+                  child: CachedNetworkImage(
+                  imageUrl: imageUrl ?? '',
+                  height: 140,
+                  width: double.infinity,
+                  fit: BoxFit.cover,
+                  placeholder: (context, url) => Container(
                     height: 140,
-                    width: double.infinity,
-                    fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) => Container(
-                      color: isNightMode ? Colors.grey[800] : Colors.grey[200],
-                      height: 140,
-                      child: Center(
-                          child: Icon(Icons.broken_image_outlined,
-                              color: isNightMode
-                                  ? Colors.grey[500]
-                                  : Colors.grey[600],
-                              size: 40)),
-                    ),
-                    loadingBuilder: (context, child, progress) =>
-                        progress == null
-                            ? child
-                            : Container(
-                                height: 140,
-                                color: isNightMode
-                                    ? Colors.grey[800]
-                                    : Colors.grey[200],
-                                child: const Center(
-                                    child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                        color: Color(0xFF009B77)))),
+                    color: isNightMode ? Colors.grey[800] : Colors.grey[200],
+                    child: const Center(
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2, color: Color(0xFF009B77))),
+                  ),
+                  errorWidget: (context, url, error) => Container(
+                    color: isNightMode ? Colors.grey[800] : Colors.grey[200],
+                    height: 140,
+                    child: Center(
+                      child: Icon(Icons.broken_image_outlined,
+                        color: isNightMode
+                          ? Colors.grey[500]
+                          : Colors.grey[600],
+                        size: 40)),
+                  ),
                   ),
                 ),
                 Expanded(

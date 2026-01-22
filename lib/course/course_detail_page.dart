@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import 'package:provider/provider.dart';
 import 'package:youtube_player_flutter/youtube_player_flutter.dart';
 import 'package:logger/logger.dart';
@@ -25,13 +27,26 @@ class CourseDetailPage extends StatefulWidget {
   _CourseDetailPageState createState() => _CourseDetailPageState();
 }
 
+class _CourseDetailCacheEntry {
+  final bool isUserPremium;
+  final List<dynamic> episodes;
+  final Map<int, bool> episodeBookmarks;
+  const _CourseDetailCacheEntry({
+    required this.isUserPremium,
+    required this.episodes,
+    required this.episodeBookmarks,
+  });
+}
+
 class _CourseDetailPageState extends State<CourseDetailPage> {
+  static final Map<int, _CourseDetailCacheEntry> _cache = {};
   final BookmarkService _bookmarkService = BookmarkService();
   bool _isUserPremium = false;
   List<dynamic>? _episodes;
   Map<int, bool> _episodeBookmarks = {};
   bool _isLoadingEpisodes = true;
   String? _errorLoadingEpisodes;
+  String? _headerImageUrl;
 
   late final UserService _userService;
   late final ContentService _contentService;
@@ -56,14 +71,40 @@ class _CourseDetailPageState extends State<CourseDetailPage> {
     _contentService = ContentService(apiService);
     _playlistService = PlaylistService(apiService);
     _uiService = UIService(); // Pass context for safety
+    _headerImageUrl =
+        _contentService.getPlayableUrl(_content[_contentType.imageKey]);
+    if (_headerImageUrl != null) {
+      _prefetchHeaderImage(_headerImageUrl!);
+    }
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _fetchAllInitialData();
     });
   }
 
-  Future<void> _fetchAllInitialData() async {
+  Future<void> _prefetchHeaderImage(String url) async {
+    try {
+      await DefaultCacheManager().downloadFile(url);
+    } catch (_) {
+      // Best-effort prefetch; ignore failures.
+    }
+  }
+
+  Future<void> _fetchAllInitialData({bool forceRefresh = false}) async {
     if (!mounted) return;
+    if (!forceRefresh) {
+      final cached = _cache[_parentId];
+      if (cached != null) {
+        setState(() {
+          _isUserPremium = cached.isUserPremium;
+          _episodes = List<dynamic>.from(cached.episodes);
+          _episodeBookmarks = Map<int, bool>.from(cached.episodeBookmarks);
+          _isLoadingEpisodes = false;
+          _errorLoadingEpisodes = null;
+        });
+        return;
+      }
+    }
     _logger.i("Fetching initial data for Course ID: $_parentId");
     setState(() {
       _isLoadingEpisodes = true;
@@ -112,6 +153,11 @@ class _CourseDetailPageState extends State<CourseDetailPage> {
       _logger.i(
           "Successfully fetched initial data. Premium: $_isUserPremium, Episodes: ${_episodes?.length}, Bookmarks: ${_episodeBookmarks.length}");
       _contentService.trackContentStart(_contentType, _parentId, token);
+      _cache[_parentId] = _CourseDetailCacheEntry(
+        isUserPremium: _isUserPremium,
+        episodes: _episodes ?? [],
+        episodeBookmarks: Map<int, bool>.from(_episodeBookmarks),
+      );
       if (mounted) setState(() => _isLoadingEpisodes = false);
     } catch (e, stackTrace) {
       _logger.e("Error in _fetchAllInitialData for Course ID: $_parentId", e,
@@ -135,6 +181,11 @@ class _CourseDetailPageState extends State<CourseDetailPage> {
 
     final bool isCurrentlyBookmarked = _episodeBookmarks[episodeId] ?? false;
     setState(() => _episodeBookmarks[episodeId] = !isCurrentlyBookmarked);
+    _cache[_parentId] = _CourseDetailCacheEntry(
+      isUserPremium: _isUserPremium,
+      episodes: _episodes ?? [],
+      episodeBookmarks: Map<int, bool>.from(_episodeBookmarks),
+    );
 
     try {
       final message = await _bookmarkService.toggleBookmark(
@@ -146,6 +197,12 @@ class _CourseDetailPageState extends State<CourseDetailPage> {
       _logger.e("Error toggling bookmark for course episode ID: $episodeId", e,
           stackTrace);
       setState(() => _episodeBookmarks[episodeId] = isCurrentlyBookmarked);
+
+      _cache[_parentId] = _CourseDetailCacheEntry(
+        isUserPremium: _isUserPremium,
+        episodes: _episodes ?? [],
+        episodeBookmarks: Map<int, bool>.from(_episodeBookmarks),
+      );
 
       if (!mounted) return;
       _uiService.showErrorSnackbar('Error updating bookmark.');
@@ -650,8 +707,7 @@ class _CourseDetailPageState extends State<CourseDetailPage> {
   }
 
   Widget _buildHeader(bool isNightMode) {
-    final String? imageUrl = _content[_contentType.imageKey] as String?;
-    final fullImageUrl = _contentService.getPlayableUrl(imageUrl);
+    final fullImageUrl = _headerImageUrl;
     final bool hasImage = fullImageUrl != null;
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
@@ -668,10 +724,16 @@ class _CourseDetailPageState extends State<CourseDetailPage> {
                     color: isNightMode ? Colors.grey[800] : Colors.grey[200],
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: Image.network(
-                    fullImageUrl,
+                  child: CachedNetworkImage(
+                    imageUrl: fullImageUrl,
                     fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => Center(
+                    fadeInDuration: Duration.zero,
+                    fadeOutDuration: Duration.zero,
+                    placeholder: (_, __) => Container(
+                      color:
+                          isNightMode ? Colors.grey[800] : Colors.grey[200],
+                    ),
+                    errorWidget: (_, __, ___) => Center(
                       child: Icon(
                         Icons.broken_image,
                         size: 48,
@@ -679,18 +741,6 @@ class _CourseDetailPageState extends State<CourseDetailPage> {
                             isNightMode ? Colors.grey[600] : Colors.grey[400],
                       ),
                     ),
-                    loadingBuilder: (context, child, loadingProgress) {
-                      if (loadingProgress == null) return child;
-                      return Center(
-                        child: CircularProgressIndicator(
-                          value: loadingProgress.expectedTotalBytes != null
-                              ? loadingProgress.cumulativeBytesLoaded /
-                                  loadingProgress.expectedTotalBytes!
-                              : null,
-                          color: const Color(0xFF009B77),
-                        ),
-                      );
-                    },
                   ),
                 ),
               ),

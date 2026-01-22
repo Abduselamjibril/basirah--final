@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:logger/logger.dart';
@@ -8,6 +10,7 @@ import '../../theme_provider.dart';
 import '../services/bookmark_service.dart'; // Using the new unified service
 import '../services/content_services/data_fetcher.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/content_cache_provider.dart';
 
 class CoursesPage extends StatefulWidget {
   const CoursesPage({super.key});
@@ -25,6 +28,8 @@ class _CoursesPageState extends State<CoursesPage> {
   String? errorMessage;
   TextEditingController searchController = TextEditingController();
   String? selectedCategory;
+  bool _imagesPrefetched = false;
+  final DefaultCacheManager _cacheManager = DefaultCacheManager();
 
   final ScrollController _scrollController = ScrollController();
   Timer? _scrollDebounce;
@@ -61,6 +66,23 @@ class _CoursesPageState extends State<CoursesPage> {
   Future<void> _fetchData({bool forceRefresh = false}) async {
     if (!mounted) return;
     _logger.i("Fetching courses... forceRefresh: $forceRefresh");
+    final cacheProvider =
+        Provider.of<ContentCacheProvider>(context, listen: false);
+
+    // Serve cached data instantly when available and not forcing refresh.
+    if (!forceRefresh && cacheProvider.hasData('courses')) {
+      final cached = cacheProvider.getData('courses');
+      setState(() {
+        courses = cached;
+        filteredCourses = cached;
+        isLoading = false;
+        errorMessage = null;
+      });
+      _prefetchImages(cached);
+      _filterCourses();
+      return;
+    }
+
     setState(() {
       isLoading = true;
       if (forceRefresh) errorMessage = null;
@@ -117,6 +139,10 @@ class _CoursesPageState extends State<CoursesPage> {
         _filterCourses();
       });
 
+      // Cache for other tabs and subsequent opens.
+      cacheProvider.setData('courses', courses);
+      _prefetchImages(courses);
+
       _logger.i(
           "Successfully fetched ${courses.length} courses and ${bookmarks.length} course bookmarks.");
 
@@ -133,6 +159,23 @@ class _CoursesPageState extends State<CoursesPage> {
           errorMessage = "Failed to load data. Please try again.";
         });
       }
+    }
+  }
+
+  void _prefetchImages(List<dynamic> items, {int limit = 12}) {
+    if (_imagesPrefetched) return;
+    _imagesPrefetched = true;
+    final urls = items
+        .map((e) => e['image_path']?.toString())
+        .where((u) => u != null && u.isNotEmpty)
+        .take(limit)
+        .toList();
+    for (final url in urls) {
+      unawaited(_cacheManager.getFileFromCache(url!).then((cached) async {
+        if (cached == null) {
+          await _cacheManager.downloadFile(url);
+        }
+      }).catchError((_) {}));
     }
   }
 
@@ -504,20 +547,16 @@ class _CoursesPageState extends State<CoursesPage> {
                   child: Container(
                     color: isNightMode ? Colors.grey[800] : Colors.grey[300],
                     child: hasImage
-                        ? Image.network(
-                            imageUrl,
-                            fit: BoxFit.cover,
-                            loadingBuilder: (context, child, progress) =>
-                                progress == null
-                                    ? child
-                                    : const Center(
-                                        child: CircularProgressIndicator(
-                                            strokeWidth: 2)),
-                            errorBuilder: (context, error, stackTrace) =>
-                                Center(
-                                    child: Icon(Icons.broken_image_outlined,
-                                        color: Colors.grey[500])),
-                          )
+                      ? CachedNetworkImage(
+                        imageUrl: imageUrl,
+                        fit: BoxFit.cover,
+                        placeholder: (context, url) => const Center(
+                          child:
+                            CircularProgressIndicator(strokeWidth: 2)),
+                        errorWidget: (context, url, error) => Center(
+                          child: Icon(Icons.broken_image_outlined,
+                            color: Colors.grey[500])),
+                        )
                         : Center(
                             child: Icon(Icons.image_not_supported_outlined,
                                 color: Colors.grey[500])),

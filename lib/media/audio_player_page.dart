@@ -3,12 +3,14 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:just_audio/just_audio.dart';
+import 'package:audio_service/audio_service.dart';
 import 'package:rxdart/rxdart.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:provider/provider.dart';
 import '../theme_provider.dart'; // Adjust path if necessary
+import '../services/audio/audio_handler.dart';
 
 // --- Screen Recording Prevention Imports ---
 import 'dart:io' show Platform;
@@ -58,6 +60,7 @@ class AudioPlayerPage extends StatefulWidget {
 class _AudioPlayerPageState extends State<AudioPlayerPage>
     with WidgetsBindingObserver {
   late final AudioPlayer _audioPlayer;
+  BasirahAudioHandler? _audioHandler;
   final _playbackSpeedOptions = [0.5, 0.75, 1.0, 1.25, 1.5, 2.0];
   bool _isLoading = true;
   bool _isBuffering = false;
@@ -69,8 +72,6 @@ class _AudioPlayerPageState extends State<AudioPlayerPage>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _audioPlayer = AudioPlayer();
-
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
         _initAudioPlayer();
@@ -80,6 +81,9 @@ class _AudioPlayerPageState extends State<AudioPlayerPage>
 
   Future<void> _initAudioPlayer() async {
     if (!mounted) return;
+
+    _audioHandler ??= await BasirahAudioHandler.init();
+    _audioPlayer = _audioHandler!.player;
 
     setState(() {
       _isLoading = true;
@@ -120,6 +124,11 @@ class _AudioPlayerPageState extends State<AudioPlayerPage>
             _sendProgressUpdate();
           }
         }
+
+        // If the player reports ready/playing, ensure UI doesn't show loading.
+        if (_isLoading && (state.processingState == ProcessingState.ready || state.playing)) {
+          setState(() => _isLoading = false);
+        }
       }, onError: (Object e, StackTrace stackTrace) {
         print('[AudioPlayerPage] Audio player stream error: $e');
         if (mounted) {
@@ -130,10 +139,27 @@ class _AudioPlayerPageState extends State<AudioPlayerPage>
           _showErrorSnackbar('Player stream error.');
         }
       });
-
-      await _audioPlayer
-          .setAudioSource(AudioSource.uri(Uri.parse(widget.audioUrl)));
-      _audioPlayer.play();
+      // If a media item is already loaded (e.g., tapped from mini player), don't reload.
+      final currentItem = _audioHandler!.mediaItem.value;
+      if (currentItem == null || currentItem.id != widget.audioUrl) {
+        final mediaItem = MediaItem(
+          id: widget.audioUrl,
+          title: widget.episodeTitle ?? currentItem?.title ?? 'Audio',
+          album: widget.storyTitle ?? currentItem?.album ?? 'Basirah',
+          artUri: (widget.imageUrl != null && widget.imageUrl!.isNotEmpty)
+              ? Uri.parse(widget.imageUrl!)
+              : currentItem?.artUri,
+          extras: {
+            'episodeId': widget.episodeId,
+            'contentId': widget.contentId,
+            'contentType': widget.contentType,
+          },
+        );
+        await _audioHandler!.loadAndPlay(mediaItem);
+      } else {
+        // Already playing this item; reflect UI immediately.
+        setState(() => _isLoading = false);
+      }
 
       if (!mounted) return;
       setState(() {
@@ -261,7 +287,7 @@ class _AudioPlayerPageState extends State<AudioPlayerPage>
     super.didChangeAppLifecycleState(state);
     if (!mounted) return;
     if (state == AppLifecycleState.paused && _audioPlayer.playing) {
-      _audioPlayer.pause();
+      // Keep playing in background; just record progress for safety.
       _sendProgressUpdate();
     }
   }
@@ -276,7 +302,6 @@ class _AudioPlayerPageState extends State<AudioPlayerPage>
         _audioPlayer.position > Duration.zero) {
       _sendProgressUpdate();
     }
-    _audioPlayer.dispose();
     super.dispose();
   }
 

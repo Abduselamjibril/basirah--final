@@ -1,12 +1,16 @@
+import 'dart:async' show unawaited;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:logger/logger.dart'; // --- LOGGER --- Import logger
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import 'deeper_look_detail_page.dart';
 import '../../theme_provider.dart';
 // --- NEW IMPORTS ---
 import '../services/bookmark_service.dart'; // Using the new unified service
 import '../services/content_services/data_fetcher.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/content_cache_provider.dart';
 
 class DeeperLookPage extends StatefulWidget {
   const DeeperLookPage({super.key});
@@ -22,6 +26,8 @@ class _DeeperLookPageState extends State<DeeperLookPage> {
   String searchQuery = "";
   bool isLoading = true;
   String? lastError;
+  bool _imagesPrefetched = false;
+  final DefaultCacheManager _cacheManager = DefaultCacheManager();
 
   final _logger = Logger(); // --- LOGGER --- Initialize the logger
 
@@ -38,6 +44,20 @@ class _DeeperLookPageState extends State<DeeperLookPage> {
     if (!mounted) return;
     _logger.i(
         "Fetching Deeper Looks... forceRefresh: $forceRefresh"); // --- LOGGER ---
+    final cacheProvider =
+        Provider.of<ContentCacheProvider>(context, listen: false);
+
+    if (!forceRefresh && cacheProvider.hasData('deeperLooks')) {
+      final cached = cacheProvider.getData('deeperLooks');
+      setState(() {
+        deeperLooks = cached;
+        lastError = null;
+        isLoading = false;
+      });
+      _prefetchImages(cached);
+      return;
+    }
+
     setState(() {
       isLoading = true;
       if (forceRefresh) lastError = null;
@@ -92,6 +112,9 @@ class _DeeperLookPageState extends State<DeeperLookPage> {
         };
         isLoading = false;
       });
+
+      cacheProvider.setData('deeperLooks', deeperLooks);
+      _prefetchImages(deeperLooks);
       // --- LOGGER ---
       _logger.i(
           "Successfully fetched ${deeperLooks.length} deeper looks and ${bookmarks.length} bookmarks.");
@@ -172,6 +195,23 @@ class _DeeperLookPageState extends State<DeeperLookPage> {
         margin: const EdgeInsets.all(16),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         duration: const Duration(seconds: 3)));
+  }
+
+  void _prefetchImages(List<dynamic> items, {int limit = 12}) {
+    if (_imagesPrefetched) return;
+    _imagesPrefetched = true;
+    final urls = items
+        .map((e) => e['image']?.toString())
+        .where((u) => u != null && u.isNotEmpty)
+        .take(limit)
+        .toList();
+    for (final url in urls) {
+      unawaited(_cacheManager.getFileFromCache(url!).then((cached) async {
+        if (cached == null) {
+          await _cacheManager.downloadFile(url);
+        }
+      }).catchError((_) {}));
+    }
   }
 
   @override
@@ -361,25 +401,21 @@ class _DeeperLookPageState extends State<DeeperLookPage> {
             color: isNightMode ? Colors.white54 : Colors.grey[600], size: 24));
     if (imageUrl != null && imageUrl.isNotEmpty) {
       return ClipRRect(
-          borderRadius: BorderRadius.circular(8.0),
-          child: Image.network(imageUrl,
-              width: size,
-              height: size,
-              fit: BoxFit.cover,
-              errorBuilder: (context, error, stackTrace) => placeholder,
-              loadingBuilder: (context, child, loadingProgress) {
-                if (loadingProgress == null) return child;
-                return SizedBox(
-                    width: size,
-                    height: size,
-                    child: Center(
-                        child: CircularProgressIndicator(
-                            strokeWidth: 2.0,
-                            value: loadingProgress.expectedTotalBytes != null
-                                ? loadingProgress.cumulativeBytesLoaded /
-                                    loadingProgress.expectedTotalBytes!
-                                : null)));
-              }));
+        borderRadius: BorderRadius.circular(8.0),
+        child: CachedNetworkImage(
+          imageUrl: imageUrl,
+          width: size,
+          height: size,
+          fit: BoxFit.cover,
+          placeholder: (context, url) => SizedBox(
+            width: size,
+            height: size,
+            child: const Center(
+                child: CircularProgressIndicator(strokeWidth: 2.0)),
+          ),
+          errorWidget: (context, url, error) => placeholder,
+        ),
+      );
     }
     return placeholder;
   }

@@ -65,8 +65,8 @@ class _AboutPageState extends State<AboutPage> {
 
     return Scaffold(
       appBar: AppBar(
-        title:
-            const Text('About Basirah', style: TextStyle(color: Colors.white)),
+        title: const Text('About Basirah TV',
+            style: TextStyle(color: Colors.white)),
         backgroundColor: appBarColor,
         iconTheme: const IconThemeData(color: Colors.white),
       ),

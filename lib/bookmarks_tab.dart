@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'dart:async';
+import 'dart:async' show unawaited;
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 
 // --- NEW/UPDATED IMPORTS ---
 // Make sure you have created this new service file from the previous step
@@ -27,10 +29,13 @@ class BookmarksTab extends StatefulWidget {
   _BookmarksTabState createState() => _BookmarksTabState();
 }
 
-class _BookmarksTabState extends State<BookmarksTab> {
+class _BookmarksTabState extends State<BookmarksTab>
+  with AutomaticKeepAliveClientMixin<BookmarksTab> {
   // --- STATE MANAGEMENT REFACTORED ---
   final BookmarkService _bookmarkService = BookmarkService();
   List<dynamic> _allBookmarks = []; // This holds the raw API response
+  final DefaultCacheManager _cacheManager = DefaultCacheManager();
+  bool _prefetchedImages = false;
 
   // These are now COMPUTED properties that filter the single source of truth
   List<dynamic> get _bookmarkedContent => _allBookmarks
@@ -82,6 +87,7 @@ class _BookmarksTabState extends State<BookmarksTab> {
       setState(() {
         _allBookmarks = bookmarks;
       });
+      _prefetchBookmarkedImages();
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -199,6 +205,7 @@ class _BookmarksTabState extends State<BookmarksTab> {
   // --- UI BUILDING SECTION ---
   @override
   Widget build(BuildContext context) {
+    super.build(context); // Ensure keep-alive works
     final themeProvider = Provider.of<ThemeProvider>(context);
     final isNightMode = themeProvider.isDarkMode;
     final Color primaryColor = const Color(0xFF009B77);
@@ -235,6 +242,9 @@ class _BookmarksTabState extends State<BookmarksTab> {
       ),
     );
   }
+
+  @override
+  bool get wantKeepAlive => true;
 
   Widget _buildContentList(bool isNightMode, Color primaryColor) {
     final List<dynamic> allContent = _bookmarkedContent;
@@ -694,23 +704,21 @@ class _BookmarksTabState extends State<BookmarksTab> {
     if (fullImageUrl != null) {
       return ClipRRect(
         borderRadius: BorderRadius.circular(8.0),
-        child: Image.network(
-          fullImageUrl,
+        child: CachedNetworkImage(
+          imageUrl: fullImageUrl,
+          cacheManager: _cacheManager,
           width: imageSize,
           height: imageSize,
           fit: BoxFit.cover,
-          loadingBuilder: (context, child, progress) => progress == null
-              ? child
-              : Container(
-                  width: imageSize,
-                  height: imageSize,
-                  color: placeholderBg,
-                  child: Center(
-                      child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          valueColor: AlwaysStoppedAnimation<Color>(
-                              loadingSpinnerColor)))),
-          errorBuilder: (context, error, stackTrace) => Container(
+          fadeInDuration: const Duration(milliseconds: 0),
+          fadeOutDuration: const Duration(milliseconds: 0),
+          useOldImageOnUrlChange: true,
+          placeholder: (context, url) => Container(
+            width: imageSize,
+            height: imageSize,
+            color: placeholderBg,
+          ),
+          errorWidget: (context, url, error) => Container(
               width: imageSize,
               height: imageSize,
               decoration: BoxDecoration(
@@ -726,6 +734,28 @@ class _BookmarksTabState extends State<BookmarksTab> {
           decoration: BoxDecoration(
               color: placeholderBg, borderRadius: BorderRadius.circular(8.0)),
           child: Icon(iconData, color: placeholderIconColor, size: 30));
+    }
+  }
+
+  void _prefetchBookmarkedImages({int limit = 24}) {
+    if (_prefetchedImages) return;
+    final urls = <String>[];
+    for (final b in _bookmarkedContent) {
+      final data = Map<String, dynamic>.from(b['bookmarkable'] ?? {});
+      final imagePath = (data['image_path'] ?? data['image'])?.toString();
+      if (imagePath != null && imagePath.isNotEmpty) {
+        urls.add('$_apiBaseUrl/storage/$imagePath');
+        if (urls.length >= limit) break;
+      }
+    }
+    if (urls.isEmpty) return;
+    _prefetchedImages = true;
+    for (final url in urls) {
+      unawaited(_cacheManager.getFileFromCache(url).then((cached) async {
+        if (cached == null) {
+          await _cacheManager.downloadFile(url);
+        }
+      }).catchError((_) {}));
     }
   }
 

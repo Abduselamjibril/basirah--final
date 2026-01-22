@@ -12,6 +12,7 @@ import 'bottom_navigation/home_page.dart';
 import 'bottom_navigation/library_page.dart';
 import 'bottom_navigation/my_learning_page.dart';
 import 'bottom_navigation/my_list_page.dart';
+import 'widgets/mini_audio_player_bar.dart';
 import 'widgets/header_navigation_bar.dart';
 import 'topbar/notifications_page.dart';
 import 'topbar/account_page.dart';
@@ -138,7 +139,7 @@ class BayyinahCloneApp extends StatelessWidget {
     return MaterialApp(
       scaffoldMessengerKey: rootScaffoldMessengerKey,
       navigatorKey: navigatorKey,
-      title: 'Basirah tv',
+      title: 'Basirah TV',
       theme: themeProvider.currentTheme,
       home: SplashScreen(),
       routes: {
@@ -272,11 +273,17 @@ class _MainScreenState extends State<MainScreen> {
         index: _currentIndex,
         children: _pages,
       ),
-      bottomNavigationBar: BottomNavigationBarWidget(
-        currentIndex: _currentIndex,
-        onTap: (index) {
-          _switchToBottomNavPage(index);
-        },
+      bottomNavigationBar: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const MiniAudioPlayerBar(),
+          BottomNavigationBarWidget(
+            currentIndex: _currentIndex,
+            onTap: (index) {
+              _switchToBottomNavPage(index);
+            },
+          ),
+        ],
       ),
     );
   }

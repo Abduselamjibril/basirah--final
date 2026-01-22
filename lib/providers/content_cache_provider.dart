@@ -23,6 +23,14 @@ class ContentCacheProvider with ChangeNotifier {
   bool get isAnythingLoading =>
       _loadingState.values.any((isLoading) => isLoading);
 
+  // --- Convenience cache helpers ---
+  bool hasData(String key) => (_cache[key] ?? []).isNotEmpty;
+  List<dynamic> getData(String key) => _cache[key] ?? [];
+  void setData(String key, List<dynamic> value) {
+    _cache[key] = value;
+    notifyListeners();
+  }
+
   // --- The main data fetching and caching method ---
   Future<void> fetchAllContent(
       {required String token, bool forceRefresh = false}) async {
