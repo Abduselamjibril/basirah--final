@@ -1,13 +1,13 @@
 // In android/build.gradle
 buildscript {
-    ext.kotlin_version = '1.8.22' // A stable, widely compatible version
+    ext.kotlin_version = '2.2.0' // Align with pluginManagement and libraries built on Kotlin 2.2
     repositories {
         google()
         mavenCentral()
     }
 
     dependencies {
-        classpath 'com.android.tools.build:gradle:8.3.0'
+        classpath 'com.android.tools.build:gradle:8.9.1'
         classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
         classpath 'com.google.gms:google-services:4.3.15'
     }

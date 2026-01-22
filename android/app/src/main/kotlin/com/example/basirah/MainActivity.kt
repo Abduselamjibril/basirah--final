@@ -1,10 +1,11 @@
 package com.example.basirah
 
-import io.flutter.embedding.android.FlutterActivity
-import android.view.WindowManager.LayoutParams
 import android.os.Bundle
+import android.view.WindowManager.LayoutParams
+import com.ryanheise.audioservice.AudioServiceActivity
 
-class MainActivity: FlutterActivity() {
+// Use AudioServiceActivity to supply the correct FlutterEngine for audio_service background/notification controls.
+class MainActivity : AudioServiceActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         window.addFlags(LayoutParams.FLAG_SECURE)

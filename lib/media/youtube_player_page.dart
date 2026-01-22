@@ -2,15 +2,14 @@
 
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io' show Platform;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:logger/logger.dart'; // Import logger
+import 'package:pod_player/pod_player.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:youtube_player_flutter/youtube_player_flutter.dart';
 
 import '../theme_provider.dart'; // Adjust path if necessary
 
@@ -60,15 +59,25 @@ class _YouTubePlayerPageState extends State<YouTubePlayerPage>
     ),
   );
 
-  late YoutubePlayerController _ytController;
-  late String _currentVideoId;
+  late PodPlayerController _podController;
+  late String _currentVideoUrl;
   late String _currentEpisodeTitle;
   late int _currentEpisodeId;
   bool _isFullScreen = false;
 
   bool _isPlayerReady = false;
-  PlayerState _playerState = PlayerState.unknown;
+  bool _isPlaying = false;
+  bool _hasMarkedCompleted = false;
+  bool _doubleTapConfigured = false;
   Timer? _progressUpdateTimer;
+  bool _isDisposing = false;
+  bool _controllerReady = false;
+
+  // Playback tuning & prefetch
+  final List<int> _qualityPriority = const [360, 480, 720, 1080];
+  final Map<int, String> _prefetchedUrlByEpisodeId = {};
+  int? _prefetchedForEpisodeId;
+  String? _currentThumbnailUrl;
 
   // --- Theme colors ---
   late Color _scaffoldBgColor;
@@ -92,36 +101,26 @@ class _YouTubePlayerPageState extends State<YouTubePlayerPage>
 
     _currentEpisodeId = widget.initialEpisodeId;
     _currentEpisodeTitle = widget.initialEpisodeTitle;
-    final initialVideoId =
-        YoutubePlayer.convertUrlToId(widget.initialYoutubeUrl);
+    final initialVideoUrl = _validateYoutubeUrl(widget.initialYoutubeUrl);
 
-    if (initialVideoId == null) {
+    if (initialVideoUrl == null) {
       _logger.e(
           "Invalid initial YouTube URL provided: ${widget.initialYoutubeUrl}");
-      _currentVideoId = 'dQw4w9WgXcQ'; // Fallback video ID
+      _currentVideoUrl = 'https://youtu.be/dQw4w9WgXcQ'; // Fallback video URL
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _handleInvalidUrl("Invalid initial YouTube URL provided.");
       });
     } else {
-      _currentVideoId = initialVideoId;
+      _currentVideoUrl = initialVideoUrl;
     }
 
     _logger.i(
-      'Initializing player for episode "${widget.initialEpisodeTitle}" (ID: $_currentEpisodeId) with Video ID: $_currentVideoId',
+      'Initializing player for episode "${widget.initialEpisodeTitle}" (ID: $_currentEpisodeId) with URL: $_currentVideoUrl',
     );
 
-    _ytController = YoutubePlayerController(
-      initialVideoId: _currentVideoId,
-      flags: const YoutubePlayerFlags(
-        autoPlay: true,
-        mute: false,
-        enableCaption: false,
-        disableDragSeek: false,
-        loop: false,
-        forceHD: false,
-        isLive: false,
-      ),
-    )..addListener(_playerListener);
+    _currentThumbnailUrl = _youtubeThumbFromUrl(_currentVideoUrl);
+
+    _initPodController(_currentVideoUrl);
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _updateThemeColors();
@@ -164,67 +163,100 @@ class _YouTubePlayerPageState extends State<YouTubePlayerPage>
   void _handleInvalidUrl(String message) {
     _logger.w("Handling invalid URL: $message");
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
+      if (!_canShowUI()) return;
       _showErrorSnackbar(message);
       if (Navigator.canPop(context)) {
         Future.delayed(const Duration(seconds: 2), () {
-          if (mounted && Navigator.canPop(context)) Navigator.of(context).pop();
+          if (_canShowUI() && Navigator.canPop(context)) {
+            Navigator.of(context).pop();
+          }
         });
       }
     });
   }
 
-  void _playerListener() {
+  void _podListener() {
     if (!mounted) return;
 
-    final currentControllerState = _ytController.value.playerState;
-    final bool wasPlayerLogicReady = _isPlayerReady;
-
-    if (_ytController.value.isReady) {
-      if (!_isPlayerReady) {
-        if (mounted) setState(() => _isPlayerReady = true);
-      }
-    } else {
-      if (_isPlayerReady) {
-        if (mounted) setState(() => _isPlayerReady = false);
-      }
-    }
-
-    if (_isPlayerReady && !wasPlayerLogicReady) {
+    final bool readyNow = _podController.isInitialised;
+    if (readyNow && !_isPlayerReady) {
       _logger.i(
-          "Player is now ready. State: ${_ytController.value.playerState.name}");
+          "Player is now ready. State: ${_podController.isVideoPlaying ? 'playing' : 'idle'}");
+      if (mounted) setState(() => _isPlayerReady = true);
       _updateEpisodeProgress(_currentEpisodeId);
-      if (_ytController.value.playerState == PlayerState.playing) {
+      if (_podController.isVideoPlaying) {
         _startPeriodicProgressUpdates();
       }
+
+      // One-time per (re)initialization adjustments
+      if (!_doubleTapConfigured) {
+        try {
+          _podController.setDoubeTapForwarDuration(10);
+          _doubleTapConfigured = true;
+        } catch (_) {}
+      }
+
+      // Listen for quality changes
+      try {
+        _podController.onVideoQualityChanged(() {
+          _logger.d('Video quality changed');
+          if (_canShowUI()) {
+            _showInfoSnackbar('Quality changed');
+          }
+        });
+      } catch (_) {}
+
+      // Prefetch next episode stream (best-effort)
+      _prefetchNextEpisode();
+    } else if (!readyNow && _isPlayerReady) {
+      if (mounted) setState(() => _isPlayerReady = false);
     }
 
-    if (_isPlayerReady && currentControllerState != _playerState) {
-      _logger.d(
-          "Player state changed from ${_playerState.name} to ${currentControllerState.name}");
-      if (mounted) setState(() => _playerState = currentControllerState);
-      if (_playerState == PlayerState.playing) {
+    final bool isPlayingNow = _podController.isVideoPlaying;
+    if (isPlayingNow != _isPlaying) {
+      if (mounted) setState(() => _isPlaying = isPlayingNow);
+      if (isPlayingNow) {
         _startPeriodicProgressUpdates();
       } else {
         _progressUpdateTimer?.cancel();
-        if (_playerState == PlayerState.paused &&
-            _ytController.value.position > Duration.zero) {
+        if (_podController.currentVideoPosition > Duration.zero) {
           _sendProgressUpdate();
         }
       }
-      if (_playerState == PlayerState.ended) {
-        _sendProgressUpdate(isCompleted: true);
-        _playNextEpisode();
-      }
     }
 
-    if (_ytController.value.errorCode != 0) {
-      _logger.e('Youtube Player Error Code: ${_ytController.value.errorCode}');
+    final bool isFullScreenNow = _podController.isFullScreen;
+    if (isFullScreenNow != _isFullScreen) {
+      if (mounted) setState(() => _isFullScreen = isFullScreenNow);
+      // Smooth orientation/UI adjustments to reduce visual distortion during transitions.
+      unawaited(_applyFullScreenUi(isFullScreenNow));
     }
+
+    _checkIfCompleted();
   }
 
   Future<void> _updateEpisodeProgress(int episodeId) async {
     await _sendProgressUpdate();
+  }
+
+  Future<void> _initPodController(String url) async {
+    final playFrom = await _resolveInitialSource(url);
+    if (!mounted) return;
+    _podController = PodPlayerController(
+      playVideoFrom: playFrom,
+      podPlayerConfig: PodPlayerConfig(
+        autoPlay: true,
+        isLooping: false,
+        videoQualityPriority: _qualityPriority,
+        wakelockEnabled: true,
+      ),
+    );
+    _podController.addListener(_podListener);
+    await _podController.initialise();
+    if (!mounted) return;
+    setState(() {
+      _controllerReady = true;
+    });
   }
 
   Future<String?> _getPhoneNumber() async {
@@ -239,13 +271,13 @@ class _YouTubePlayerPageState extends State<YouTubePlayerPage>
 
   void _startPeriodicProgressUpdates() {
     _progressUpdateTimer?.cancel();
-    if (_isPlayerReady &&
-        _ytController.value.playerState == PlayerState.playing) {
+    if (_isPlayerReady && _podController.isVideoPlaying) {
       _logger.d("Starting periodic progress updates every 15 seconds.");
       _progressUpdateTimer =
           Timer.periodic(const Duration(seconds: 15), (timer) {
-        if (mounted && _ytController.value.playerState == PlayerState.playing) {
+        if (mounted && _podController.isVideoPlaying) {
           _sendProgressUpdate();
+          _checkIfCompleted();
         } else {
           _logger.d("Stopping periodic progress updates.");
           timer.cancel();
@@ -254,7 +286,27 @@ class _YouTubePlayerPageState extends State<YouTubePlayerPage>
     }
   }
 
-  Future<void> _sendProgressUpdate({bool isCompleted = false}) async {
+  void _checkIfCompleted() {
+    if (!_isPlayerReady) return;
+    final duration = _podController.totalVideoLength;
+    final position = _podController.currentVideoPosition;
+    if (duration == Duration.zero) return;
+
+    final bool nearEnd = (duration.inSeconds - position.inSeconds) <= 1 &&
+        duration > Duration.zero;
+    if (nearEnd && !_hasMarkedCompleted) {
+      _hasMarkedCompleted = true;
+      _logger
+          .i("Playback reached the end; sending completion and moving next.");
+      _sendProgressUpdate(isCompleted: true);
+      _playNextEpisode();
+    } else if (!nearEnd) {
+      _hasMarkedCompleted = false;
+    }
+  }
+
+  Future<void> _sendProgressUpdate(
+      {bool isCompleted = false, bool showErrors = true}) async {
     if (!_isPlayerReady && !isCompleted) return;
 
     final phoneNumber = await _getPhoneNumber();
@@ -263,17 +315,25 @@ class _YouTubePlayerPageState extends State<YouTubePlayerPage>
       return;
     }
 
-    final currentPositionSeconds = _ytController.value.position.inSeconds;
-    final totalDurationSeconds = _ytController.metadata.duration.inSeconds;
+    final currentPositionSeconds =
+        _podController.currentVideoPosition.inSeconds;
+    final totalDurationSeconds = _podController.totalVideoLength.inSeconds;
 
-    final bool nearEnd = totalDurationSeconds > 0 &&
-        (totalDurationSeconds - currentPositionSeconds) < 5;
-    if (currentPositionSeconds <= 0 &&
-        !isCompleted &&
-        !nearEnd &&
-        totalDurationSeconds > 5) {
-      _logger.d("Skipping progress update at the beginning of the video.");
-      return;
+    // Avoid sending noisy updates when playback hasn't started or metadata is unknown.
+    if (!isCompleted) {
+      if (currentPositionSeconds <= 0) {
+        _logger.d("Skipping progress update: position at 0s.");
+        return;
+      }
+      if (totalDurationSeconds <= 0) {
+        _logger.d("Skipping progress update: duration metadata unavailable.");
+        return;
+      }
+      final bool nearEnd = (totalDurationSeconds - currentPositionSeconds) < 5;
+      if (!nearEnd && totalDurationSeconds > 5 && currentPositionSeconds <= 0) {
+        _logger.d("Skipping progress update at the beginning of the video.");
+        return;
+      }
     }
 
     _logger.i(
@@ -302,7 +362,7 @@ class _YouTubePlayerPageState extends State<YouTubePlayerPage>
 
       if (response.statusCode == 401) {
         _logger.w("Authentication failed. User may need to log in again.");
-        if (mounted) {
+        if (showErrors && _canShowUI()) {
           _showErrorSnackbar("Session expired. Please log in again.");
         }
       } else if (response.statusCode >= 400) {
@@ -329,6 +389,30 @@ class _YouTubePlayerPageState extends State<YouTubePlayerPage>
     }
   }
 
+  void _playPreviousEpisode() {
+    final currentIndex = widget.otherEpisodes.indexWhere(
+        (ep) => int.tryParse(ep['id'] ?? '-1') == _currentEpisodeId);
+    if (currentIndex > 0) {
+      _logger.i("Playing previous episode in the playlist.");
+      _playEpisode(widget.otherEpisodes[currentIndex - 1]);
+    } else {
+      _logger.i("Already at the first episode.");
+      if (mounted) _showInfoSnackbar("You're at the first episode.");
+    }
+  }
+
+  bool _hasNextEpisode() {
+    final idx = widget.otherEpisodes
+        .indexWhere((ep) => int.tryParse(ep['id'] ?? '-1') == _currentEpisodeId);
+    return idx != -1 && idx < widget.otherEpisodes.length - 1;
+  }
+
+  bool _hasPreviousEpisode() {
+    final idx = widget.otherEpisodes
+        .indexWhere((ep) => int.tryParse(ep['id'] ?? '-1') == _currentEpisodeId);
+    return idx > 0;
+  }
+
   void _playEpisode(Map<String, String> episode) {
     final String? url = episode['url'] ?? episode['youtube_url'];
     final String? title = episode['title'] ?? episode['name'];
@@ -347,8 +431,8 @@ class _YouTubePlayerPageState extends State<YouTubePlayerPage>
         _showErrorSnackbar("Cannot play episode: invalid episode ID format.");
       return;
     }
-    final String? videoId = YoutubePlayer.convertUrlToId(url);
-    if (videoId == null) {
+    final String? validatedUrl = _validateYoutubeUrl(url);
+    if (validatedUrl == null) {
       _logger.w("Cannot play '$title': Invalid YouTube URL. URL: '$url'");
       if (mounted)
         _showErrorSnackbar("Cannot play '$title': Invalid YouTube URL.");
@@ -356,51 +440,57 @@ class _YouTubePlayerPageState extends State<YouTubePlayerPage>
     }
 
     _logger.i(
-        'Playing new episode: "$title" (ID: $episodeId), Video ID: $videoId');
+        'Playing new episode: "$title" (ID: $episodeId), URL: $validatedUrl');
     if (mounted) {
       if (_isPlayerReady) _sendProgressUpdate();
+      _progressUpdateTimer?.cancel();
       setState(() {
-        _currentVideoId = videoId;
+        _currentVideoUrl = validatedUrl;
         _currentEpisodeTitle = title;
         _currentEpisodeId = episodeId;
         _isPlayerReady = false;
-        _playerState = PlayerState.unknown;
+        _isPlaying = false;
+        _hasMarkedCompleted = false;
+        _doubleTapConfigured = false;
+        _currentThumbnailUrl = _youtubeThumbFromUrl(validatedUrl);
       });
     }
-    _ytController.load(videoId);
+
+    final String? direct = _prefetchedUrlByEpisodeId[episodeId];
+    if (direct != null && direct.isNotEmpty) {
+      _podController.changeVideo(
+        playVideoFrom: PlayVideoFrom.network(direct),
+        playerConfig: PodPlayerConfig(
+          autoPlay: true,
+          isLooping: false,
+          videoQualityPriority: _qualityPriority,
+          wakelockEnabled: true,
+        ),
+      );
+    } else {
+      _podController.changeVideo(
+        playVideoFrom: PlayVideoFrom.youtube(validatedUrl),
+        playerConfig: PodPlayerConfig(
+          autoPlay: true,
+          isLooping: false,
+          videoQualityPriority: _qualityPriority,
+          wakelockEnabled: true,
+        ),
+      );
+    }
     FocusScope.of(context).unfocus();
-  }
 
-  void _enterFullScreen() {
-    if (_isFullScreen) return; // Prevent re-entry
-
-    _logger.d("Entering full screen.");
-    _isFullScreen = true;
-
-    SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
-    SystemChrome.setPreferredOrientations(
-        [DeviceOrientation.landscapeLeft, DeviceOrientation.landscapeRight]);
-
-    if (mounted) setState(() {});
-  }
-
-  void _exitFullScreen() {
-    if (!_isFullScreen) return; // Prevent re-exit
-
-    _logger.d("Exiting full screen.");
-    _isFullScreen = false;
-
-    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
-    SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
-
-    if (mounted) setState(() {});
+    // Prefetch the next one for smoother transition
+    _prefetchNextEpisode();
   }
 
   void _showErrorSnackbar(String message) {
-    if (!mounted) return;
+    if (!mounted || _isDisposing) return;
+    final messenger = ScaffoldMessenger.maybeOf(context);
+    if (messenger == null) return;
     final Color errorBgColor = Colors.redAccent.shade700;
-    ScaffoldMessenger.of(context).removeCurrentSnackBar();
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+    messenger.removeCurrentSnackBar();
+    messenger.showSnackBar(SnackBar(
       content: Text(message, style: const TextStyle(color: Colors.white)),
       behavior: SnackBarBehavior.floating,
       backgroundColor: errorBgColor,
@@ -411,9 +501,11 @@ class _YouTubePlayerPageState extends State<YouTubePlayerPage>
   }
 
   void _showInfoSnackbar(String message) {
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).removeCurrentSnackBar();
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+    if (!mounted || _isDisposing) return;
+    final messenger = ScaffoldMessenger.maybeOf(context);
+    if (messenger == null) return;
+    messenger.removeCurrentSnackBar();
+    messenger.showSnackBar(SnackBar(
       content: Text(message, style: const TextStyle(color: Colors.white)),
       behavior: SnackBarBehavior.floating,
       backgroundColor: _infoSnackbarBgColor,
@@ -424,6 +516,42 @@ class _YouTubePlayerPageState extends State<YouTubePlayerPage>
     ));
   }
 
+  Future<void> _applyFullScreenUi(bool isFullScreen) async {
+    if (isFullScreen) {
+      await SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+      await SystemChrome.setPreferredOrientations(
+          [DeviceOrientation.landscapeLeft, DeviceOrientation.landscapeRight]);
+    } else {
+      await SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+      await SystemChrome.setPreferredOrientations(
+          [DeviceOrientation.portraitUp]);
+    }
+  }
+
+  Future<PlayVideoFrom> _resolveInitialSource(String url) async {
+    try {
+      final list = await PodPlayerController.getYoutubeUrls(url);
+      if (list != null && list.isNotEmpty) {
+        String? chosen;
+        for (final q in _qualityPriority) {
+          for (final item in list) {
+            if (item.quality == q) {
+              chosen = item.url;
+              break;
+            }
+          }
+          if (chosen != null) break;
+        }
+        chosen ??= list.first.url;
+        _prefetchedUrlByEpisodeId[_currentEpisodeId] = chosen;
+        return PlayVideoFrom.network(chosen);
+      }
+    } catch (e) {
+      _logger.d('Initial resolve failed, fallback to YouTube: $e');
+    }
+    return PlayVideoFrom.youtube(url);
+  }
+
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     super.didChangeAppLifecycleState(state);
@@ -431,9 +559,9 @@ class _YouTubePlayerPageState extends State<YouTubePlayerPage>
     if (!mounted) return;
     if (state == AppLifecycleState.paused &&
         _isPlayerReady &&
-        _ytController.value.playerState == PlayerState.playing) {
+        _podController.isVideoPlaying) {
       _logger.i("App paused, pausing video and sending progress update.");
-      _ytController.pause();
+      _podController.pause();
       _sendProgressUpdate();
     }
   }
@@ -445,7 +573,7 @@ class _YouTubePlayerPageState extends State<YouTubePlayerPage>
     // and prevents the fullscreen toggle loop
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
-        final newIsFullScreen = _ytController.value.isFullScreen;
+        final newIsFullScreen = _podController.isFullScreen;
         if (newIsFullScreen != _isFullScreen) {
           setState(() {
             _isFullScreen = newIsFullScreen;
@@ -458,6 +586,7 @@ class _YouTubePlayerPageState extends State<YouTubePlayerPage>
   @override
   void dispose() {
     _logger.i('Disposing YouTubePlayerPage.');
+    _isDisposing = true;
     WidgetsBinding.instance.removeObserver(this);
     _progressUpdateTimer?.cancel();
 
@@ -467,99 +596,99 @@ class _YouTubePlayerPageState extends State<YouTubePlayerPage>
       SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
     }
 
-    if (mounted &&
-        _isPlayerReady &&
-        (_ytController.value.position > Duration.zero)) {
-      _sendProgressUpdate();
+    if (_isPlayerReady &&
+        (_podController.currentVideoPosition > Duration.zero)) {
+      // Avoid showing UI during dispose; just attempt a silent progress update.
+      _sendProgressUpdate(showErrors: false);
     }
 
-    _ytController.removeListener(_playerListener);
-    _ytController.dispose();
+    _podController.removeListener(_podListener);
+    _podController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     _updateThemeColors();
-    final playerTopBarIconColor = Colors.white;
 
-    return YoutubePlayerBuilder(
-      onExitFullScreen: _exitFullScreen,
-      onEnterFullScreen: _enterFullScreen,
-      player: YoutubePlayer(
-        controller: _ytController,
-        showVideoProgressIndicator: true,
-        progressIndicatorColor: _primaryColor,
-        progressColors: ProgressBarColors(
-          playedColor: _primaryColor,
-          handleColor: _primaryColor.withOpacity(0.9),
-        ),
-        onReady: () {
-          if (mounted && _ytController.value.isReady && !_isPlayerReady) {
-            _playerListener();
-          }
-        },
-        topActions: <Widget>[
-          const SizedBox(width: 8.0),
-          if (!_isFullScreen && Navigator.canPop(context))
-            IconButton(
-                icon: Icon(Icons.arrow_back_ios_new,
-                    color: playerTopBarIconColor, size: 20.0),
-                onPressed: () => Navigator.pop(context)),
-          const Spacer(),
-          const SizedBox(width: 8.0),
-        ],
-      ),
-      builder: (context, playerWidgetFromBuilder) {
-        return Scaffold(
-          appBar: _isFullScreen
-              ? null
-              : AppBar(
-                  title: Text(
-                    _currentEpisodeTitle,
-                    style: const TextStyle(
-                      color: Color.fromARGB(255, 0, 0, 0),
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  backgroundColor: _appBarColor,
-                  elevation: 0,
-                  iconTheme: IconThemeData(color: _appBarIconColor),
+    return Scaffold(
+      appBar: _isFullScreen
+          ? null
+          : AppBar(
+              title: Text(
+                _currentEpisodeTitle,
+                style: const TextStyle(
+                  color: Color.fromARGB(255, 0, 0, 0),
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
                 ),
-          backgroundColor: _scaffoldBgColor,
-          body: SafeArea(
-            top: !_isFullScreen,
-            bottom: !_isFullScreen,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                AspectRatio(
-                  aspectRatio: 16 / 9,
-                  child: playerWidgetFromBuilder,
-                ),
-                if (!_isFullScreen)
-                  Expanded(
-                    child: Container(
-                      color: _belowPlayerBgColor,
-                      child: SingleChildScrollView(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            _buildVideoInfo(),
-                            _buildPlaylist(),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-              ],
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              backgroundColor: _appBarColor,
+              elevation: 0,
+              iconTheme: IconThemeData(color: _appBarIconColor),
             ),
-          ),
-        );
-      },
+      backgroundColor: _scaffoldBgColor,
+      body: SafeArea(
+        top: !_isFullScreen,
+        bottom: !_isFullScreen,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            AspectRatio(
+              aspectRatio: 16 / 9,
+              child: !_controllerReady
+                  ? _buildInitialPlaceholder()
+                  : Stack(
+                      children: [
+                        PodVideoPlayer(
+                          controller: _podController,
+                          videoThumbnail: _currentThumbnailUrl == null
+                              ? null
+                              : DecorationImage(
+                                  image: NetworkImage(_currentThumbnailUrl!),
+                                  fit: BoxFit.cover,
+                                ),
+                          podPlayerLabels: const PodPlayerLabels(
+                            play: 'Play',
+                            pause: 'Pause',
+                            mute: 'Mute',
+                            unmute: 'Unmute',
+                            fullscreen: 'Fullscreen',
+                            exitFullScreen: 'Exit fullscreen',
+                            settings: 'Settings',
+                            quality: 'Quality',
+                            playbackSpeed: 'Speed',
+                          ),
+                          podProgressBarConfig: PodProgressBarConfig(
+                            playingBarColor: _primaryColor,
+                            circleHandlerColor: _primaryColor.withOpacity(0.9),
+                          ),
+                        ),
+                        if (_hasPreviousEpisode()) _buildNavButton(isNext: false),
+                        if (_hasNextEpisode()) _buildNavButton(isNext: true),
+                      ],
+                    ),
+            ),
+            if (!_isFullScreen)
+              Expanded(
+                child: Container(
+                  color: _belowPlayerBgColor,
+                  child: SingleChildScrollView(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildVideoInfo(),
+                        _buildPlaylist(),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -573,6 +702,51 @@ class _YouTubePlayerPageState extends State<YouTubePlayerPage>
               color: _videoTitleColor),
           maxLines: 2,
           overflow: TextOverflow.ellipsis),
+    );
+  }
+
+  Widget _buildInitialPlaceholder() {
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        if (_currentThumbnailUrl != null)
+          Image.network(_currentThumbnailUrl!, fit: BoxFit.cover),
+        Container(color: Colors.black.withOpacity(0.35)),
+        const Center(
+          child: SizedBox(
+            width: 36,
+            height: 36,
+            child: CircularProgressIndicator(strokeWidth: 3),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildNavButton({required bool isNext}) {
+    final alignment = isNext ? Alignment.centerRight : Alignment.centerLeft;
+    final icon = isNext ? Icons.skip_next_rounded : Icons.skip_previous_rounded;
+    final onTap = isNext ? _playNextEpisode : _playPreviousEpisode;
+
+    return Align(
+      alignment: alignment,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 6.0),
+        child: Material(
+          color: Colors.black.withOpacity(0.35),
+          shape: const CircleBorder(),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            onTap: onTap,
+            customBorder: const CircleBorder(),
+            child: SizedBox(
+              width: 46,
+              height: 46,
+              child: Icon(icon, color: Colors.white),
+            ),
+          ),
+        ),
+      ),
     );
   }
 
@@ -661,9 +835,7 @@ class _YouTubePlayerPageState extends State<YouTubePlayerPage>
                               child: Icon(Icons.smart_display_rounded)),
                     ),
                   ),
-                  if (isCurrent &&
-                      _isPlayerReady &&
-                      _playerState == PlayerState.playing)
+                  if (isCurrent && _isPlayerReady && _isPlaying)
                     Positioned.fill(
                       child: Container(
                         decoration: BoxDecoration(
@@ -692,5 +864,90 @@ class _YouTubePlayerPageState extends State<YouTubePlayerPage>
         ),
       ),
     );
+  }
+
+  String? _validateYoutubeUrl(String url) {
+    final trimmed = url.trim();
+    final uri = Uri.tryParse(trimmed);
+    if (uri == null) return null;
+    final scheme = uri.scheme.toLowerCase();
+    if (scheme != 'http' && scheme != 'https') return null;
+    final host = uri.host.toLowerCase();
+    if (!host.contains('youtube.com') && !host.contains('youtu.be')) {
+      return null;
+    }
+    return trimmed;
+  }
+
+  String? _youtubeThumbFromUrl(String url) {
+    final id = _extractYoutubeId(url);
+    if (id == null) return null;
+    return 'https://img.youtube.com/vi/$id/hqdefault.jpg';
+  }
+
+  String? _extractYoutubeId(String url) {
+    try {
+      final uri = Uri.parse(url);
+      final host = uri.host.toLowerCase();
+      if (host.contains('youtu.be')) {
+        final segs = uri.pathSegments;
+        if (segs.isNotEmpty) return segs.first;
+      }
+      if (host.contains('youtube.com')) {
+        final v = uri.queryParameters['v'];
+        if (v != null && v.isNotEmpty) return v;
+        // Shorts or embed
+        final segs = uri.pathSegments;
+        if (segs.contains('shorts') && segs.length >= 2) {
+          return segs[1];
+        }
+        if (segs.contains('embed') && segs.length >= 2) {
+          return segs[1];
+        }
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  Future<void> _prefetchNextEpisode() async {
+    final idx = widget.otherEpisodes.indexWhere(
+        (ep) => int.tryParse(ep['id'] ?? '-1') == _currentEpisodeId);
+    if (idx == -1 || idx >= widget.otherEpisodes.length - 1) return;
+    final next = widget.otherEpisodes[idx + 1];
+    final idStr = next['id'];
+    final String? url = next['url'] ?? next['youtube_url'];
+    final int? nextId = int.tryParse(idStr ?? '');
+    if (nextId == null || url == null) return;
+    if (_prefetchedForEpisodeId == nextId) return; // already prefetched
+    if (_prefetchedUrlByEpisodeId.containsKey(nextId)) return;
+    final valid = _validateYoutubeUrl(url);
+    if (valid == null) return;
+    try {
+      final list = await PodPlayerController.getYoutubeUrls(valid);
+      if (list == null || list.isEmpty) return;
+      // pick best based on our priority order
+      String? chosen;
+      for (final q in _qualityPriority) {
+        for (final item in list) {
+          if (item.quality == q) {
+            chosen = item.url;
+            break;
+          }
+        }
+        if (chosen != null) break;
+      }
+      chosen ??= list.first.url;
+      _prefetchedUrlByEpisodeId[nextId] = chosen;
+      _prefetchedForEpisodeId = nextId;
+      _logger.d('Prefetched next episode direct URL at quality: ' +
+          (list.first.quality.toString()));
+    } catch (e) {
+      _logger.d('Prefetch failed: $e');
+    }
+  }
+
+  bool _canShowUI() {
+    // Keep a lightweight check that avoids ancestor lookups on deactivated widgets.
+    return mounted && !_isDisposing;
   }
 }

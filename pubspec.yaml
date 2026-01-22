@@ -10,6 +10,7 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  better_player_plus: ^1.1.2
   http: ^1.2.1
   cupertino_icons: ^1.0.8
   shared_preferences: ^2.0.0
@@ -20,11 +21,15 @@ dependencies:
   # Using the latest STABLE version of youtube_player_flutter.
   # This version is compatible with modern Firebase and flutter_inappwebview.
   youtube_player_flutter: ^9.0.0
+
+  # Rich feature video player with YouTube/Vimeo support, quality picker, PiP, gestures.
+  pod_player: ^0.2.2
   
   # This version is compatible with the stable youtube_player and Firebase.
   flutter_inappwebview: ^6.0.0  
   
   just_audio: ^0.9.24
+  audio_service: ^0.18.12
   provider: ^6.1.2
   logger: ^1.1.0
   connectivity_plus: ^5.0.1
@@ -42,6 +47,13 @@ dependencies:
   flutter_stripe: ^10.1.1 
   webview_flutter: ^4.7.0 
   url_launcher: ^6.2.6
+
+  cached_network_image: ^3.3.1
+  wakelock_plus: ^1.2.5
+  screen_brightness: ^2.1.7
+
+dependency_overrides:
+  package_info_plus: 8.0.0 # Avoid Kotlin 2.2 metadata in 9.x which breaks KGP 1.9.x
   
   
   # url_launcher_web is brought in by url_launcher, so it's not always needed here.
@@ -61,8 +73,4 @@ flutter:
     - assets/Basirah_splash.png
     - assets/stripe_logo.png
     - assets/chapa_logo.png
-    - assets/images/quran_1.jpg
-    - assets/images/quran_2.jpg
-    - assets/images/quran_3.jpg
-    - assets/images/quran_4.jpg
     - assets/images/logo.png
