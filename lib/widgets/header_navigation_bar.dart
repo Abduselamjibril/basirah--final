@@ -48,10 +48,10 @@ class HeaderNavigationBar extends StatelessWidget
               ? const Color(0xFF002147)
               : Colors.white.withOpacity(0.85),
           title: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 8.0),
+            padding: const EdgeInsets.symmetric(vertical: 4.0),
             child: Image.asset(
               'assets/images/logo.png',
-              height: 32.0,
+              height: 100.0,
             ),
           ),
           actions: [

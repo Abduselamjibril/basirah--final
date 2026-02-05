@@ -2,6 +2,8 @@
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:video_player/video_player.dart';
+
 import 'providers/auth_provider.dart';
 import 'topbar/login_page.dart';
 
@@ -13,43 +15,51 @@ class SplashScreen extends StatefulWidget {
 }
 
 class _SplashScreenState extends State<SplashScreen> {
+  late final VideoPlayerController _videoController;
+  late final Future<void> _initializeVideoFuture;
+
   @override
   void initState() {
     super.initState();
-    // `addPostFrameCallback` ensures that the context is fully available before
-    // we try to use it with Provider, which is a robust practice.
+    _videoController = VideoPlayerController.asset('assets/splash_vid.mp4');
+    _initializeVideoFuture = _videoController.initialize().then((_) {
+      _videoController
+        ..setLooping(true)
+        ..play();
+      if (mounted) {
+        setState(() {});
+      }
+    }).catchError((_) {});
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _initializeAppAndNavigate();
     });
   }
 
+  @override
+  void dispose() {
+    _videoController.dispose();
+    super.dispose();
+  }
+
   Future<void> _initializeAppAndNavigate() async {
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
 
-    // --- ROBUST TIMING AND AUTHENTICATION ---
-    // We run two futures in parallel:
-    // 1. A timer for the minimum splash screen duration (your 4 seconds).
-    // 2. The authentication check from our refactored AuthProvider.
-    // `Future.wait` completes only after BOTH of these are finished.
-    final List<dynamic> results = await Future.wait([
-      Future.delayed(
-          const Duration(seconds: 4)), // Your desired splash duration
-      authProvider.tryAutoLogin(), // The authentication check
+    final results = await Future.wait([
+      Future.delayed(const Duration(seconds: 7)),
+      authProvider.tryAutoLogin(),
+      _safeWaitForVideo(),
     ]);
 
-    // The result of `tryAutoLogin` is the second item in the list.
-    final bool isLoggedIn = results[1];
+    final bool isLoggedIn = results[1] as bool;
 
-    // This check prevents a "setState called after dispose" error if the user
-    // navigates away or closes the app while the futures are running.
-    if (!mounted) return;
+    if (!mounted) {
+      return;
+    }
 
-    // Now, navigate based on the definitive result of the auth check.
     if (isLoggedIn) {
-      // Go to the main screen. Using a named route is clean.
       Navigator.pushReplacementNamed(context, '/home');
     } else {
-      // Go to the login page.
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (context) => LoginPage()),
@@ -57,17 +67,61 @@ class _SplashScreenState extends State<SplashScreen> {
     }
   }
 
+  Future<void> _safeWaitForVideo() async {
+    try {
+      await _initializeVideoFuture;
+    } catch (_) {}
+  }
+
   @override
   Widget build(BuildContext context) {
-    // Your existing splash screen UI is perfect.
     return Scaffold(
-      body: Container(
-        decoration: const BoxDecoration(
-          image: DecorationImage(
-            image: AssetImage("assets/Basirah_splash.png"),
-            fit: BoxFit.cover,
+      backgroundColor: Colors.black,
+      body: Stack(
+        fit: StackFit.expand,
+        children: [
+          FutureBuilder<void>(
+            future: _initializeVideoFuture,
+            builder: (context, snapshot) {
+              final initialized =
+                  snapshot.connectionState == ConnectionState.done &&
+                      _videoController.value.isInitialized;
+              if (initialized) {
+                final size = _videoController.value.size;
+                return FittedBox(
+                  fit: BoxFit.cover,
+                  child: SizedBox(
+                    width: size.width,
+                    height: size.height,
+                    child: VideoPlayer(_videoController),
+                  ),
+                );
+              }
+              return Container(color: Colors.black);
+            },
           ),
-        ),
+          // No overlay so the video shows unobstructed.
+          Container(color: Colors.transparent),
+          FutureBuilder<void>(
+            future: _initializeVideoFuture,
+            builder: (context, snapshot) {
+              final stillLoading = snapshot.connectionState != ConnectionState.done;
+              if (stillLoading) {
+                return const Center(
+                  child: SizedBox(
+                    width: 40,
+                    height: 40,
+                    child: CircularProgressIndicator(
+                      valueColor:
+                          AlwaysStoppedAnimation<Color>(Color(0xFF009B77)),
+                    ),
+                  ),
+                );
+              }
+              return const SizedBox.shrink();
+            },
+          ),
+        ],
       ),
     );
   }

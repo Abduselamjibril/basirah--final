@@ -4,13 +4,10 @@ import 'dart:async' show unawaited;
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 
-// --- NEW/UPDATED IMPORTS ---
-// Make sure you have created this new service file from the previous step
 import '../services/bookmark_service.dart';
 import '../providers/auth_provider.dart';
 import '../theme_provider.dart';
 
-// --- PAGE IMPORTS (no changes needed here) ---
 import 'course/course_detail_page.dart';
 import 'surah/surah_detail_page.dart';
 import 'story/story_detail_page.dart';
