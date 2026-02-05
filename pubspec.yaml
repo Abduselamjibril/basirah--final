@@ -1,4 +1,4 @@
-name: basirah
+name: basirahtv
 description: "Basirah App"
 publish_to: 'none' 
 
@@ -64,6 +64,11 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^4.0.0
+  flutter_launcher_icons: ^0.13.1
+flutter_icons:
+  android: true
+  ios: false
+  image_path: "assets/images/App-icon.jpg"
 
 flutter:
   uses-material-design: true

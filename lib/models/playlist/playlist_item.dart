@@ -1,4 +1,4 @@
-import 'package:basirah/models/playlist/generic_episode.dart';
+import 'package:basirahtv/models/playlist/generic_episode.dart';
 
 class PlaylistItem {
   final int itemId;

@@ -5,9 +5,10 @@ import 'package:provider/provider.dart';
 import '../theme_provider.dart';
 import '../services/notification_service.dart';
 import 'package:badges/badges.dart' as badges;
-import 'package:basirah/screens/gift_page.dart'; // NEW: Import the new gift page
+import 'package:basirahtv/screens/gift_page.dart'; // NEW: Import the new gift page
 
-class HeaderNavigationBar extends StatelessWidget implements PreferredSizeWidget {
+class HeaderNavigationBar extends StatelessWidget
+    implements PreferredSizeWidget {
   final VoidCallback onNotificationTapped;
   final VoidCallback onProfileTapped;
   final VoidCallback onThemeToggle;
@@ -61,7 +62,7 @@ class HeaderNavigationBar extends StatelessWidget implements PreferredSizeWidget
               icon: Icon(isNightMode ? Icons.light_mode : Icons.dark_mode),
               color: iconColor,
             ),
-            
+
             // --- NEW: Gift Icon Button ---
             IconButton(
               tooltip: 'Gift a Subscription',
@@ -78,7 +79,7 @@ class HeaderNavigationBar extends StatelessWidget implements PreferredSizeWidget
             //   icon: const Icon(Icons.help_outline),
             //   color: iconColor,
             // ),
-            
+
             badges.Badge(
               position: badges.BadgePosition.topEnd(top: 4, end: 4),
               badgeContent: Text(

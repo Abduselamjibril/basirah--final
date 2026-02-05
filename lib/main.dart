@@ -26,7 +26,8 @@ import 'theme_provider.dart';
 import 'services/notification_service.dart';
 import 'services/auth_http_service.dart';
 
-import 'package:basirah/screens/gift_page.dart';
+// import 'package:basirahtv/screens/gift_page.dart';
+import 'screens/gift_page.dart';
 import 'firebase_options.dart';
 
 final GlobalKey<ScaffoldMessengerState> rootScaffoldMessengerKey =

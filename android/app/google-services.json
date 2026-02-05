@@ -7,6 +7,25 @@
   "client": [
     {
       "client_info": {
+        "mobilesdk_app_id": "1:470589391861:android:3f389f742b5d4aa27b56bc",
+        "android_client_info": {
+          "package_name": "com.basirahtv.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB092EF6hvm5tuM_Pmtu3veFX1tFxRL_9w"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
         "mobilesdk_app_id": "1:470589391861:android:391d39cc904199357b56bc",
         "android_client_info": {
           "package_name": "com.example.basirah"

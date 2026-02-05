@@ -1,4 +1,4 @@
-package com.example.basirah
+package com.basirahtv.app
 
 import android.os.Bundle
 import android.view.WindowManager.LayoutParams
@@ -8,6 +8,6 @@ import com.ryanheise.audioservice.AudioServiceActivity
 class MainActivity : AudioServiceActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        window.addFlags(LayoutParams.FLAG_SECURE)
+        window.addFlags(LayoutParams.FLAG_SECURE) // temporarily disabled
     }
 }
