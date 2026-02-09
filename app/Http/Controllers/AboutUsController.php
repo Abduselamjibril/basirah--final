@@ -9,6 +9,14 @@ use Illuminate\Support\Facades\Validator;
 class AboutUsController extends Controller
 {
     // Public method for Flutter App
+        /**
+         * @OA\Get(
+         *     path="/about-us",
+         *     summary="Get About Us content",
+         *     tags={"AboutUs"},
+         *     @OA\Response(response=200, description="About Us content returned")
+         * )
+         */
     public function get()
     {
         $content = AboutUs::firstOrCreate(
@@ -19,6 +27,23 @@ class AboutUsController extends Controller
     }
 
     // Admin method to update content
+        /**
+         * @OA\Post(
+         *     path="/admin/about-us",
+         *     summary="Update About Us content",
+         *     tags={"AboutUs"},
+         *     @OA\RequestBody(
+         *         required=true,
+         *         @OA\JsonContent(
+         *             required={"title","content"},
+         *             @OA\Property(property="title", type="string"),
+         *             @OA\Property(property="content", type="string")
+         *         )
+         *     ),
+         *     @OA\Response(response=200, description="About Us updated"),
+         *     @OA\Response(response=422, description="Validation error")
+         * )
+         */
     public function update(Request $request)
     {
         $validator = Validator::make($request->all(), [

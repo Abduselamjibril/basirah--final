@@ -16,6 +16,21 @@ class SurahEpisodeController extends Controller
      */
     public function index(Surah $surah)
     {
+        /**
+         * @OA\Get(
+         *     path="/surahs/{surah_id}/episodes",
+         *     summary="Get all episodes for a specific surah",
+         *     tags={"SurahEpisode"},
+         *     @OA\Parameter(
+         *         name="surah_id",
+         *         in="path",
+         *         required=true,
+         *         description="Surah ID",
+         *         @OA\Schema(type="integer")
+         *     ),
+         *     @OA\Response(response=200, description="List of surah episodes.")
+         * )
+         */
         return SurahEpisodeResource::collection($surah->episodes()->orderBy('created_at', 'asc')->get());
     }
 
@@ -24,6 +39,32 @@ class SurahEpisodeController extends Controller
      */
     public function store(Request $request, Surah $surah)
     {
+        /**
+         * @OA\Post(
+         *     path="/surahs/{surah_id}/episodes",
+         *     summary="Create a new episode for a surah",
+         *     tags={"SurahEpisode"},
+         *     @OA\Parameter(
+         *         name="surah_id",
+         *         in="path",
+         *         required=true,
+         *         description="Surah ID",
+         *         @OA\Schema(type="integer")
+         *     ),
+         *     @OA\RequestBody(
+         *         required=true,
+         *         @OA\JsonContent(
+         *             required={"name"},
+         *             @OA\Property(property="name", type="string"),
+         *             @OA\Property(property="video", type="string", format="binary"),
+         *             @OA\Property(property="audio", type="string", format="binary"),
+         *             @OA\Property(property="youtube_link", type="string")
+         *         )
+         *     ),
+         *     @OA\Response(response=201, description="Surah episode created successfully."),
+         *     @OA\Response(response=422, description="Validation error.")
+         * )
+         */
         // --- THE FIX IS HERE ---
         // 1. Calculate the boolean conditions beforehand.
         $videoIsRequired = !$request->filled('youtube_link');
@@ -60,6 +101,29 @@ class SurahEpisodeController extends Controller
      */
     public function show(Surah $surah, SurahEpisode $episode)
     {
+        /**
+         * @OA\Get(
+         *     path="/surahs/{surah_id}/episodes/{episode_id}",
+         *     summary="Get a single episode for a surah",
+         *     tags={"SurahEpisode"},
+         *     @OA\Parameter(
+         *         name="surah_id",
+         *         in="path",
+         *         required=true,
+         *         description="Surah ID",
+         *         @OA\Schema(type="integer")
+         *     ),
+         *     @OA\Parameter(
+         *         name="episode_id",
+         *         in="path",
+         *         required=true,
+         *         description="Episode ID",
+         *         @OA\Schema(type="integer")
+         *     ),
+         *     @OA\Response(response=200, description="Surah episode found."),
+         *     @OA\Response(response=404, description="Surah episode not found.")
+         * )
+         */
         // This is safe because of scopeBindings() in your route file.
         // If the episode doesn't belong to the surah, Laravel returns a 404.
         return new SurahEpisodeResource($episode);
@@ -70,8 +134,40 @@ class SurahEpisodeController extends Controller
      */
     public function update(Request $request, Surah $surah, SurahEpisode $episode)
     {
+        /**
+         * @OA\Put(
+         *     path="/surahs/{surah_id}/episodes/{episode_id}",
+         *     summary="Update a surah episode",
+         *     tags={"SurahEpisode"},
+         *     @OA\Parameter(
+         *         name="surah_id",
+         *         in="path",
+         *         required=true,
+         *         description="Surah ID",
+         *         @OA\Schema(type="integer")
+         *     ),
+         *     @OA\Parameter(
+         *         name="episode_id",
+         *         in="path",
+         *         required=true,
+         *         description="Episode ID",
+         *         @OA\Schema(type="integer")
+         *     ),
+         *     @OA\RequestBody(
+         *         required=false,
+         *         @OA\JsonContent(
+         *             @OA\Property(property="name", type="string"),
+         *             @OA\Property(property="video", type="string", format="binary"),
+         *             @OA\Property(property="audio", type="string", format="binary"),
+         *             @OA\Property(property="youtube_link", type="string")
+         *         )
+         *     ),
+         *     @OA\Response(response=200, description="Surah episode updated successfully."),
+         *     @OA\Response(response=404, description="Surah episode not found.")
+         * )
+         */
         // scopeBindings() in the route file makes this manual check unnecessary.
-        
+
         $request->validate([
             'name' => 'sometimes|required|string|max:255',
             'video' => 'nullable|file|mimetypes:video/mp4,video/avi,video/mpeg,video/quicktime,video/webm|max: 1048576',
@@ -109,8 +205,31 @@ class SurahEpisodeController extends Controller
      */
     public function destroy(Surah $surah, SurahEpisode $episode)
     {
+        /**
+         * @OA\Delete(
+         *     path="/surahs/{surah_id}/episodes/{episode_id}",
+         *     summary="Delete a surah episode",
+         *     tags={"SurahEpisode"},
+         *     @OA\Parameter(
+         *         name="surah_id",
+         *         in="path",
+         *         required=true,
+         *         description="Surah ID",
+         *         @OA\Schema(type="integer")
+         *     ),
+         *     @OA\Parameter(
+         *         name="episode_id",
+         *         in="path",
+         *         required=true,
+         *         description="Episode ID",
+         *         @OA\Schema(type="integer")
+         *     ),
+         *     @OA\Response(response=200, description="Surah Episode deleted successfully."),
+         *     @OA\Response(response=404, description="Surah episode not found.")
+         * )
+         */
         // scopeBindings() in the route file makes this manual check unnecessary.
-        
+
         if ($episode->video) {
             Storage::disk('public')->delete($episode->video);
         }
@@ -127,6 +246,29 @@ class SurahEpisodeController extends Controller
      */
     public function lock(Surah $surah, SurahEpisode $episode)
     {
+        /**
+         * @OA\Patch(
+         *     path="/surahs/{surah_id}/episodes/{episode_id}/lock",
+         *     summary="Lock a surah episode",
+         *     tags={"SurahEpisode"},
+         *     @OA\Parameter(
+         *         name="surah_id",
+         *         in="path",
+         *         required=true,
+         *         description="Surah ID",
+         *         @OA\Schema(type="integer")
+         *     ),
+         *     @OA\Parameter(
+         *         name="episode_id",
+         *         in="path",
+         *         required=true,
+         *         description="Episode ID",
+         *         @OA\Schema(type="integer")
+         *     ),
+         *     @OA\Response(response=200, description="Surah Episode locked successfully."),
+         *     @OA\Response(response=404, description="Surah episode not found.")
+         * )
+         */
         // scopeBindings() in the route file makes this manual check unnecessary.
         $episode->is_locked = true;
         $episode->save();
@@ -142,6 +284,29 @@ class SurahEpisodeController extends Controller
      */
     public function unlock(Surah $surah, SurahEpisode $episode)
     {
+        /**
+         * @OA\Patch(
+         *     path="/surahs/{surah_id}/episodes/{episode_id}/unlock",
+         *     summary="Unlock a surah episode",
+         *     tags={"SurahEpisode"},
+         *     @OA\Parameter(
+         *         name="surah_id",
+         *         in="path",
+         *         required=true,
+         *         description="Surah ID",
+         *         @OA\Schema(type="integer")
+         *     ),
+         *     @OA\Parameter(
+         *         name="episode_id",
+         *         in="path",
+         *         required=true,
+         *         description="Episode ID",
+         *         @OA\Schema(type="integer")
+         *     ),
+         *     @OA\Response(response=200, description="Surah Episode unlocked successfully."),
+         *     @OA\Response(response=404, description="Surah episode not found.")
+         * )
+         */
         // scopeBindings() in the route file makes this manual check unnecessary.
         $episode->is_locked = false;
         $episode->save();

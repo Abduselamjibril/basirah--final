@@ -21,7 +21,7 @@ class EpisodeResource extends JsonResource
             $hasFullAccess = true;
         } elseif (auth()->guard('sanctum')->check()) {
             $user = auth()->guard('sanctum')->user();
-            $hasFullAccess = $user ? $user->isSubscribedAndActive() : false;
+            $hasFullAccess = ($user instanceof \App\Models\User) ? $user->isSubscribedAndActive() : false;
         }
         // --- END OF FIX ---
 
@@ -36,7 +36,7 @@ class EpisodeResource extends JsonResource
 
             'video_path' => $this->video_path ? Storage::disk('public')->url($this->video_path) : null,
             'audio_path' => $this->audio_path ? Storage::disk('public')->url($this->audio_path) : null,
-            
+
             // The final lock status for the current requester.
             'is_locked' => $isContentGenerallyLocked && !$hasFullAccess,
 

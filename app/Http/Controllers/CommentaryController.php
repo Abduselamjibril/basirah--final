@@ -14,6 +14,14 @@ class CommentaryController extends Controller
         $commentaries = Commentary::with('episodes')->get();
         return CommentaryResource::collection($commentaries);
     }
+        /**
+         * @OA\Get(
+         *     path="/commentaries",
+         *     summary="Get all commentaries",
+         *     tags={"Commentary"},
+         *     @OA\Response(response=200, description="List of commentaries")
+         * )
+         */
 
     public function show($id)
     {
@@ -23,6 +31,22 @@ class CommentaryController extends Controller
         }
         return new CommentaryResource($commentary);
     }
+        /**
+         * @OA\Get(
+         *     path="/commentaries/{id}",
+         *     summary="Get a single commentary by ID",
+         *     tags={"Commentary"},
+         *     @OA\Parameter(
+         *         name="id",
+         *         in="path",
+         *         required=true,
+         *         description="Commentary ID",
+         *         @OA\Schema(type="integer")
+         *     ),
+         *     @OA\Response(response=200, description="Commentary found"),
+         *     @OA\Response(response=404, description="Commentary not found.")
+         * )
+         */
 
     public function store(Request $request)
     {
@@ -46,6 +70,25 @@ class CommentaryController extends Controller
             'data' => new CommentaryResource($commentary)
         ], 201);
     }
+        /**
+         * @OA\Post(
+         *     path="/commentaries",
+         *     summary="Create a new commentary",
+         *     tags={"Commentary"},
+         *     @OA\RequestBody(
+         *         required=true,
+         *         @OA\JsonContent(
+         *             required={"title"},
+         *             @OA\Property(property="title", type="string"),
+         *             @OA\Property(property="image", type="string", format="binary"),
+         *             @OA\Property(property="description", type="string"),
+         *             @OA\Property(property="is_premium", type="boolean")
+         *         )
+         *     ),
+         *     @OA\Response(response=201, description="Commentary created successfully."),
+         *     @OA\Response(response=422, description="Validation error")
+         * )
+         */
 
     public function update(Request $request, $id)
     {
@@ -75,6 +118,31 @@ class CommentaryController extends Controller
             'data' => new CommentaryResource($commentary)
         ], 200);
     }
+        /**
+         * @OA\Put(
+         *     path="/commentaries/{id}",
+         *     summary="Update a commentary",
+         *     tags={"Commentary"},
+         *     @OA\Parameter(
+         *         name="id",
+         *         in="path",
+         *         required=true,
+         *         description="Commentary ID",
+         *         @OA\Schema(type="integer")
+         *     ),
+         *     @OA\RequestBody(
+         *         required=false,
+         *         @OA\JsonContent(
+         *             @OA\Property(property="title", type="string"),
+         *             @OA\Property(property="image", type="string", format="binary"),
+         *             @OA\Property(property="description", type="string"),
+         *             @OA\Property(property="is_premium", type="boolean")
+         *         )
+         *     ),
+         *     @OA\Response(response=200, description="Commentary updated successfully."),
+         *     @OA\Response(response=404, description="Commentary not found.")
+         * )
+         */
 
     public function destroy($id)
     {
@@ -85,6 +153,22 @@ class CommentaryController extends Controller
         $commentary->delete();
         return response()->json(['message' => 'Commentary deleted successfully.'], 200);
     }
+        /**
+         * @OA\Delete(
+         *     path="/commentaries/{id}",
+         *     summary="Delete a commentary",
+         *     tags={"Commentary"},
+         *     @OA\Parameter(
+         *         name="id",
+         *         in="path",
+         *         required=true,
+         *         description="Commentary ID",
+         *         @OA\Schema(type="integer")
+         *     ),
+         *     @OA\Response(response=200, description="Commentary deleted successfully."),
+         *     @OA\Response(response=404, description="Commentary not found.")
+         * )
+         */
 
     public function lock($id)
     {
@@ -98,6 +182,22 @@ class CommentaryController extends Controller
             'data' => new CommentaryResource($commentary->load('episodes'))
         ]);
     }
+        /**
+         * @OA\Patch(
+         *     path="/commentaries/{id}/lock",
+         *     summary="Lock a commentary and set to premium",
+         *     tags={"Commentary"},
+         *     @OA\Parameter(
+         *         name="id",
+         *         in="path",
+         *         required=true,
+         *         description="Commentary ID",
+         *         @OA\Schema(type="integer")
+         *     ),
+         *     @OA\Response(response=200, description="Commentary locked and set to premium."),
+         *     @OA\Response(response=404, description="Commentary not found.")
+         * )
+         */
 
     public function unlock($id)
     {
@@ -111,4 +211,20 @@ class CommentaryController extends Controller
             'data' => new CommentaryResource($commentary->load('episodes'))
         ]);
     }
+        /**
+         * @OA\Patch(
+         *     path="/commentaries/{id}/unlock",
+         *     summary="Unlock a commentary and set to free",
+         *     tags={"Commentary"},
+         *     @OA\Parameter(
+         *         name="id",
+         *         in="path",
+         *         required=true,
+         *         description="Commentary ID",
+         *         @OA\Schema(type="integer")
+         *     ),
+         *     @OA\Response(response=200, description="Commentary unlocked and set to free."),
+         *     @OA\Response(response=404, description="Commentary not found.")
+         * )
+         */
 }

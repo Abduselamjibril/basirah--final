@@ -9,6 +9,14 @@ use Illuminate\Support\Facades\Validator;
 class ContactInformationController extends Controller
 {
     // Public method for Flutter App
+        /**
+         * @OA\Get(
+         *     path="/contact-information",
+         *     summary="Get contact information",
+         *     tags={"ContactInformation"},
+         *     @OA\Response(response=200, description="Contact information returned")
+         * )
+         */
     public function get()
     {
         $info = ContactInformation::firstOrCreate(
@@ -19,6 +27,23 @@ class ContactInformationController extends Controller
     }
 
     // Admin method to update info
+        /**
+         * @OA\Put(
+         *     path="/contact-information",
+         *     summary="Update contact information",
+         *     tags={"ContactInformation"},
+         *     @OA\RequestBody(
+         *         required=true,
+         *         @OA\JsonContent(
+         *             required={"phone_number","email"},
+         *             @OA\Property(property="phone_number", type="string"),
+         *             @OA\Property(property="email", type="string", format="email")
+         *         )
+         *     ),
+         *     @OA\Response(response=200, description="Contact Information updated successfully."),
+         *     @OA\Response(response=422, description="Validation error")
+         * )
+         */
     public function update(Request $request)
     {
         $validator = Validator::make($request->all(), [

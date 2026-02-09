@@ -14,6 +14,24 @@ class PaymentRequestController extends Controller
     /**
      * Store a new manual payment request from the Flutter app.
      */
+        /**
+         * @OA\Post(
+         *     path="/payment-requests",
+         *     summary="Store a new manual payment request from the Flutter app",
+         *     tags={"PaymentRequest"},
+         *     @OA\RequestBody(
+         *         required=true,
+         *         @OA\JsonContent(
+         *             required={"plan","transaction_id"},
+         *             @OA\Property(property="plan", type="string", enum={"six_month","yearly"}),
+         *             @OA\Property(property="transaction_id", type="string")
+         *         )
+         *     ),
+         *     @OA\Response(response=201, description="Payment request submitted for review."),
+         *     @OA\Response(response=422, description="Validation error"),
+         *     @OA\Response(response=500, description="Server error")
+         * )
+         */
     public function store(Request $request)
     {
         $validator = \Validator::make($request->all(), [
@@ -46,6 +64,14 @@ class PaymentRequestController extends Controller
     /**
      * Fetch all pending payment requests for the React admin panel.
      */
+        /**
+         * @OA\Get(
+         *     path="/payment-requests",
+         *     summary="Fetch all pending payment requests for the React admin panel",
+         *     tags={"PaymentRequest"},
+         *     @OA\Response(response=200, description="List of pending payment requests.")
+         * )
+         */
     public function index()
     {
         $pendingPayments = PaymentRequest::with('user:id,first_name,last_name,phone_number')
@@ -59,6 +85,23 @@ class PaymentRequestController extends Controller
     /**
      * Approve a payment request from the React admin panel.
      */
+        /**
+         * @OA\Patch(
+         *     path="/payment-requests/{id}/approve",
+         *     summary="Approve a payment request from the React admin panel",
+         *     tags={"PaymentRequest"},
+         *     @OA\Parameter(
+         *         name="id",
+         *         in="path",
+         *         required=true,
+         *         description="PaymentRequest ID",
+         *         @OA\Schema(type="integer")
+         *     ),
+         *     @OA\Response(response=200, description="Payment approved successfully. User subscription is now active."),
+         *     @OA\Response(response=409, description="Request already processed."),
+         *     @OA\Response(response=404, description="Associated user not found.")
+         * )
+         */
     public function approve(PaymentRequest $paymentRequest)
     {
         if ($paymentRequest->status !== 'pending') {
@@ -71,7 +114,7 @@ class PaymentRequestController extends Controller
         }
 
         // --- START OF UPDATED LOGIC ---
-        
+
         // Define prices for revenue logging
         $prices = [
             'six_month' => 6000,

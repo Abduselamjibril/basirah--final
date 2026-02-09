@@ -21,7 +21,7 @@ class SurahResource extends JsonResource
             $hasFullAccess = true;
         } elseif (auth()->guard('sanctum')->check()) {
             $user = auth()->guard('sanctum')->user();
-            $hasFullAccess = $user ? $user->isSubscribedAndActive() : false;
+            $hasFullAccess = ($user instanceof \App\Models\User) ? $user->isSubscribedAndActive() : false;
         }
         // --- END OF FIX ---
 
@@ -30,13 +30,13 @@ class SurahResource extends JsonResource
             'name' => $this->name,
             'description' => $this->description,
             'image' => $this->image ? Storage::disk('public')->url($this->image) : null,
-            
+
             'is_premium' => (bool) $this->is_premium,
             'is_locked' => $this->is_premium && !$hasFullAccess,
 
             'created_at' => $this->created_at->toDateTimeString(),
             'updated_at' => $this->updated_at->toDateTimeString(),
-            
+
             'episodes' => SurahEpisodeResource::collection($this->whenLoaded('episodes')),
         ];
     }

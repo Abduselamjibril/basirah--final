@@ -19,7 +19,27 @@ use Illuminate\Validation\Rule;
 class AuthController extends Controller
 {
     /**
-     * Register a new user.
+     * @OA\Post(
+     *     path="/register",
+     *     summary="Register a new user",
+     *     tags={"Auth"},
+     *     @OA\RequestBody(
+     *         required=true,
+     *         @OA\JsonContent(
+     *             required={"first_name","last_name","phone_number","password","password_confirmation","device_id"},
+     *             @OA\Property(property="first_name", type="string"),
+     *             @OA\Property(property="last_name", type="string"),
+     *             @OA\Property(property="email", type="string", format="email"),
+     *             @OA\Property(property="phone_number", type="string"),
+     *             @OA\Property(property="password", type="string"),
+     *             @OA\Property(property="password_confirmation", type="string"),
+     *             @OA\Property(property="device_id", type="string"),
+     *             @OA\Property(property="device_name", type="string")
+     *         )
+     *     ),
+     *     @OA\Response(response=201, description="User registered successfully"),
+     *     @OA\Response(response=422, description="Validation error")
+     * )
      */
     public function register(Request $request): JsonResponse
     {
@@ -70,8 +90,6 @@ class AuthController extends Controller
             return response()->json(['message' => 'Registration failed. Please try again.'], 500);
         }
 
-        // --- THIS IS THE FIX ---
-        // Return the token AND the newly created user object, just like in the login method.
         return response()->json([
             'message' => 'User registered successfully',
             'token' => $plainTextToken,
@@ -81,14 +99,33 @@ class AuthController extends Controller
                 'last_name' => $user->last_name,
                 'phone_number' => $user->phone_number,
                 'email' => $user->email,
-                'is_subscribed_and_active' => $user->isSubscribedAndActive(), // Will default to false for new users
+                'is_subscribed_and_active' => ($user instanceof \App\Models\User) ? $user->isSubscribedAndActive() : false,
             ],
         ], 201);
     }
 
+    /**
+     * @OA\Post(
+     *     path="/login",
+     *     summary="Login user",
+     *     tags={"Auth"},
+     *     @OA\RequestBody(
+     *         required=true,
+     *         @OA\JsonContent(
+     *             required={"phone_number","password","device_id"},
+     *             @OA\Property(property="phone_number", type="string"),
+     *             @OA\Property(property="password", type="string"),
+     *             @OA\Property(property="device_id", type="string"),
+     *             @OA\Property(property="device_name", type="string")
+     *         )
+     *     ),
+     *     @OA\Response(response=200, description="Login successful"),
+     *     @OA\Response(response=401, description="Invalid login attempt"),
+     *     @OA\Response(response=429, description="Too many login attempts")
+     * )
+     */
     public function login(Request $request): JsonResponse
     {
-        // This method remains unchanged and is correct
         $validator = Validator::make($request->all(), [
             'phone_number' => 'required|string',
             'password' => 'required|string',
@@ -162,12 +199,19 @@ class AuthController extends Controller
                 'last_name' => $user->last_name,
                 'phone_number' => $user->phone_number,
                 'email' => $user->email,
-                'is_subscribed_and_active' => $user->isSubscribedAndActive(),
+                'is_subscribed_and_active' => ($user instanceof \App\Models\User) ? $user->isSubscribedAndActive() : false,
             ],
         ], 200);
     }
 
-    // --- The rest of your controller methods (logout, forgotPassword, etc.) are correct and remain unchanged ---
+    /**
+     * @OA\Post(
+     *     path="/logout",
+     *     summary="Logout user",
+     *     tags={"Auth"},
+     *     @OA\Response(response=200, description="Logged out successfully")
+     * )
+     */
     public function logout(Request $request): JsonResponse
     {
         $user = $request->user();
@@ -187,6 +231,21 @@ class AuthController extends Controller
         return response()->json(['message' => 'Logged out successfully'], 200);
     }
 
+    /**
+     * @OA\Post(
+     *     path="/forgot-password",
+     *     summary="Send password reset OTP to email",
+     *     tags={"Auth"},
+     *     @OA\RequestBody(
+     *         required=true,
+     *         @OA\JsonContent(
+     *             required={"email"},
+     *             @OA\Property(property="email", type="string", format="email")
+     *         )
+     *     ),
+     *     @OA\Response(response=200, description="Reset code sent if account found")
+     * )
+     */
     public function forgotPassword(Request $request): JsonResponse
     {
         $validator = Validator::make($request->all(), ['email' => 'required|email|exists:users,email']);
@@ -211,6 +270,23 @@ class AuthController extends Controller
         return response()->json(['message' => 'If a matching account was found, a reset code has been sent to your email.'], 200);
     }
 
+    /**
+     * @OA\Post(
+     *     path="/verify-otp",
+     *     summary="Verify OTP for password reset",
+     *     tags={"Auth"},
+     *     @OA\RequestBody(
+     *         required=true,
+     *         @OA\JsonContent(
+     *             required={"email","otp"},
+     *             @OA\Property(property="email", type="string", format="email"),
+     *             @OA\Property(property="otp", type="integer")
+     *         )
+     *     ),
+     *     @OA\Response(response=200, description="OTP verified successfully"),
+     *     @OA\Response(response=401, description="Invalid OTP or expired")
+     * )
+     */
     public function verifyOtp(Request $request): JsonResponse
     {
         $validator = Validator::make($request->all(), [
@@ -235,6 +311,25 @@ class AuthController extends Controller
         return response()->json(['message' => 'OTP verified successfully.'], 200);
     }
 
+    /**
+     * @OA\Post(
+     *     path="/reset-password",
+     *     summary="Reset password using OTP",
+     *     tags={"Auth"},
+     *     @OA\RequestBody(
+     *         required=true,
+     *         @OA\JsonContent(
+     *             required={"email","otp","password","password_confirmation"},
+     *             @OA\Property(property="email", type="string", format="email"),
+     *             @OA\Property(property="otp", type="integer"),
+     *             @OA\Property(property="password", type="string"),
+     *             @OA\Property(property="password_confirmation", type="string")
+     *         )
+     *     ),
+     *     @OA\Response(response=200, description="Password reset successfully"),
+     *     @OA\Response(response=401, description="Invalid OTP or expired")
+     * )
+     */
     public function resetPassword(Request $request): JsonResponse
     {
         $validator = Validator::make($request->all(), [
@@ -264,6 +359,24 @@ class AuthController extends Controller
         return response()->json(['message' => 'Password has been reset successfully. Please login.'], 200);
     }
 
+    /**
+     * @OA\Post(
+     *     path="/change-password",
+     *     summary="Change password for authenticated user",
+     *     tags={"Auth"},
+     *     @OA\RequestBody(
+     *         required=true,
+     *         @OA\JsonContent(
+     *             required={"current_password","password","password_confirmation"},
+     *             @OA\Property(property="current_password", type="string"),
+     *             @OA\Property(property="password", type="string"),
+     *             @OA\Property(property="password_confirmation", type="string")
+     *         )
+     *     ),
+     *     @OA\Response(response=200, description="Password changed successfully"),
+     *     @OA\Response(response=401, description="Current password does not match")
+     * )
+     */
     public function changePassword(Request $request): JsonResponse
     {
         $user = $request->user();
@@ -287,6 +400,24 @@ class AuthController extends Controller
         return response()->json(['message' => 'Password changed successfully.'], 200);
     }
 
+    /**
+     * @OA\Put(
+     *     path="/profile",
+     *     summary="Update user profile",
+     *     tags={"Auth"},
+     *     @OA\RequestBody(
+     *         required=true,
+     *         @OA\JsonContent(
+     *             required={"first_name","last_name","phone_number"},
+     *             @OA\Property(property="first_name", type="string"),
+     *             @OA\Property(property="last_name", type="string"),
+     *             @OA\Property(property="email", type="string", format="email"),
+     *             @OA\Property(property="phone_number", type="string")
+     *         )
+     *     ),
+     *     @OA\Response(response=200, description="Profile updated successfully")
+     * )
+     */
     public function updateProfile(Request $request): JsonResponse
     {
         $user = $request->user();
@@ -316,10 +447,10 @@ class AuthController extends Controller
             Log::error('User profile update failed', ['error' => $e->getMessage(), 'user_id' => $user->id]);
             return response()->json(['message' => 'Profile update failed. Please try again.'], 500);
         }
-        
+
         return response()->json([
             'message' => 'Profile updated successfully.',
-            'user' => $user->fresh() 
+            'user' => $user->fresh()
         ], 200);
     }
 }

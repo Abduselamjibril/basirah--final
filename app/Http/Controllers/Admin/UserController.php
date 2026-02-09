@@ -16,11 +16,26 @@ class UserController extends Controller
      * @param \App\Models\User $user
      * @return \Illuminate\Http\JsonResponse
      */
+        /**
+         * @OA\Post(
+         *     path="/admin/users/{user}/reset-password",
+         *     summary="Reset a user's password to default",
+         *     tags={"AdminUser"},
+         *     @OA\Parameter(
+         *         name="user",
+         *         in="path",
+         *         required=true,
+         *         description="User ID",
+         *         @OA\Schema(type="integer")
+         *     ),
+         *     @OA\Response(response=200, description="Password reset successful")
+         * )
+         */
     public function resetPassword(User $user): JsonResponse
     {
         // The default password
         $defaultPassword = '00000000';
-        
+
         $user->password = Hash::make($defaultPassword);
         $user->save();
 

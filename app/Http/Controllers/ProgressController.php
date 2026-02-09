@@ -21,6 +21,24 @@ class ProgressController extends Controller
 {
     private const ALLOWED_CONTENT_TYPES = ['course', 'surah', 'story', 'deeper_look', 'commentary'];
 
+        /**
+         * @OA\Post(
+         *     path="/progress/start",
+         *     summary="Start or update tracking for a content item",
+         *     tags={"Progress"},
+         *     @OA\RequestBody(
+         *         required=true,
+         *         @OA\JsonContent(
+         *             required={"content_id","content_type"},
+         *             @OA\Property(property="content_id", type="integer"),
+         *             @OA\Property(property="content_type", type="string", enum={"course","surah","story","deeper_look","commentary"})
+         *         )
+         *     ),
+         *     @OA\Response(response=200, description="Tracking started/updated successfully."),
+         *     @OA\Response(response=422, description="Validation error."),
+         *     @OA\Response(response=500, description="Server error.")
+         * )
+         */
     public function startTracking(Request $request)
     {
         $validator = Validator::make($request->all(), [
@@ -68,6 +86,28 @@ class ProgressController extends Controller
         }
     }
 
+        /**
+         * @OA\Post(
+         *     path="/progress/update",
+         *     summary="Update progress for an episode",
+         *     tags={"Progress"},
+         *     @OA\RequestBody(
+         *         required=true,
+         *         @OA\JsonContent(
+         *             required={"episode_id","content_id","content_type","current_position_seconds"},
+         *             @OA\Property(property="episode_id", type="integer"),
+         *             @OA\Property(property="content_id", type="integer"),
+         *             @OA\Property(property="content_type", type="string", enum={"course","surah","story","deeper_look","commentary"}),
+         *             @OA\Property(property="current_position_seconds", type="integer"),
+         *             @OA\Property(property="total_duration_seconds", type="integer"),
+         *             @OA\Property(property="is_completed", type="boolean")
+         *         )
+         *     ),
+         *     @OA\Response(response=200, description="Progress updated successfully."),
+         *     @OA\Response(response=422, description="Validation error."),
+         *     @OA\Response(response=500, description="Server error.")
+         * )
+         */
     public function updateProgress(Request $request)
     {
         $validator = Validator::make($request->all(), [
@@ -133,6 +173,15 @@ class ProgressController extends Controller
         }
     }
 
+        /**
+         * @OA\Get(
+         *     path="/progress/my-learning",
+         *     summary="Get the user's learning progress records",
+         *     tags={"Progress"},
+         *     @OA\Response(response=200, description="Learning progress records."),
+         *     @OA\Response(response=500, description="Server error.")
+         * )
+         */
     public function getMyLearning(Request $request)
     {
         // Validator no longer needed as we get the user directly

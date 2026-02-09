@@ -13,6 +13,35 @@ class PayoutController extends Controller
 {
     public function index(Request $request)
     {
+            /**
+             * @OA\Get(
+             *     path="/admin/payouts",
+             *     summary="Get list of payouts",
+             *     tags={"Payout"},
+             *     @OA\Parameter(
+             *         name="status",
+             *         in="query",
+             *         required=false,
+             *         description="Filter by payout status",
+             *         @OA\Schema(type="string")
+             *     ),
+             *     @OA\Parameter(
+             *         name="start_date",
+             *         in="query",
+             *         required=false,
+             *         description="Start date for filtering",
+             *         @OA\Schema(type="string", format="date")
+             *     ),
+             *     @OA\Parameter(
+             *         name="end_date",
+             *         in="query",
+             *         required=false,
+             *         description="End date for filtering",
+             *         @OA\Schema(type="string", format="date")
+             *     ),
+             *     @OA\Response(response=200, description="List of payouts returned")
+             * )
+             */
         $query = Payout::with(['requester:id,name', 'reviewer:id,name']);
 
         // Filtering logic
@@ -32,6 +61,23 @@ class PayoutController extends Controller
 
     public function store(Request $request)
     {
+            /**
+             * @OA\Post(
+             *     path="/admin/payouts",
+             *     summary="Create a payout request",
+             *     tags={"Payout"},
+             *     @OA\RequestBody(
+             *         required=true,
+             *         @OA\JsonContent(
+             *             required={"amount"},
+             *             @OA\Property(property="amount", type="number", format="float")
+             *         )
+             *     ),
+             *     @OA\Response(response=201, description="Payout request submitted successfully"),
+             *     @OA\Response(response=403, description="Unauthorized"),
+             *     @OA\Response(response=422, description="Payout amount exceeds available balance")
+             * )
+             */
         // Security: Hardcoded check for Basirah admin
         if (Auth::user()->email !== 'basirah@gmail.com') {
             return response()->json(['message' => 'Unauthorized'], 403);
@@ -60,6 +106,30 @@ class PayoutController extends Controller
 
     public function updateStatus(Request $request, Payout $payout)
     {
+            /**
+             * @OA\Put(
+             *     path="/admin/payouts/{payout}",
+             *     summary="Update payout status",
+             *     tags={"Payout"},
+             *     @OA\Parameter(
+             *         name="payout",
+             *         in="path",
+             *         required=true,
+             *         description="Payout ID",
+             *         @OA\Schema(type="integer")
+             *     ),
+             *     @OA\RequestBody(
+             *         required=true,
+             *         @OA\JsonContent(
+             *             required={"status"},
+             *             @OA\Property(property="status", type="string", enum={"approved","declined"})
+             *         )
+             *     ),
+             *     @OA\Response(response=200, description="Payout status updated successfully"),
+             *     @OA\Response(response=403, description="Unauthorized"),
+             *     @OA\Response(response=409, description="This payout has already been processed")
+             * )
+             */
         // Security: Hardcoded check for Skylink admin
         if (Auth::user()->email !== 'skylink@gmail.com') {
             return response()->json(['message' => 'Unauthorized'], 403);

@@ -14,6 +14,19 @@ class WebhookController extends Controller
 {
     public function handleStripe(Request $request)
     {
+            /**
+             * @OA\Post(
+             *     path="/webhooks/stripe",
+             *     summary="Handle Stripe webhook events",
+             *     tags={"Webhook"},
+             *     @OA\RequestBody(
+             *         required=true,
+             *         @OA\JsonContent()
+             *     ),
+             *     @OA\Response(response=200, description="Stripe webhook processed successfully."),
+             *     @OA\Response(response=400, description="Webhook error.")
+             * )
+             */
         // ... Your Stripe handling logic is likely fine, no changes needed here ...
         $payload = @file_get_contents('php://input');
         $sig_header = $request->header('Stripe-Signature');
@@ -38,18 +51,31 @@ class WebhookController extends Controller
 
   public function handleChapa(Request $request)
     {
+        /**
+         * @OA\Post(
+         *     path="/webhooks/chapa",
+         *     summary="Handle Chapa webhook events",
+         *     tags={"Webhook"},
+         *     @OA\RequestBody(
+         *         required=true,
+         *         @OA\JsonContent()
+         *     ),
+         *     @OA\Response(response=200, description="Chapa webhook processed successfully."),
+         *     @OA\Response(response=400, description="Webhook error.")
+         * )
+         */
         Log::info('Chapa Webhook Endpoint Hit.', [
             'method' => $request->method(),
             'data' => $request->all()
         ]);
 
-        $tx_ref = $request->input('trx_ref'); 
+        $tx_ref = $request->input('trx_ref');
 
         if (!$tx_ref) {
             Log::warning('Chapa Webhook: No trx_ref found in the request. Ignoring.');
             return response()->json(['status' => 'ignored']);
         }
-        
+
         try {
             $chapaSecretKey = config('services.chapa.secret');
             $verifyResponse = Http::withHeaders([
@@ -63,7 +89,7 @@ class WebhookController extends Controller
 
             if ($verifyResponse->successful() && $verifyResponse->json()['status'] === 'success') {
                 $verifiedData = $verifyResponse->json()['data'];
-                
+
                 // =======================================================
                 // THE FINAL FIX: Chapa returns metadata in the 'meta' key
                 $userId = $verifiedData['meta']['user_id'] ?? null;
@@ -84,7 +110,7 @@ class WebhookController extends Controller
                 'error' => $e->getMessage()
             ]);
         }
-        
+
         return response()->json(['status' => 'processed']);
     }
 
@@ -96,7 +122,7 @@ class WebhookController extends Controller
             // Check if the user is already subscribed to prevent double processing
             // (This is a safety check, e.g., if both GET and POST webhooks process)
             // You can add more complex logic here if needed.
-            
+
             $user->is_subscribed = true;
 
             $currentExpiry = $user->subscription_expires_at ?? now();
@@ -110,7 +136,7 @@ class WebhookController extends Controller
             } else { // Assumes 'six_month'
                  $user->subscription_expires_at = $currentExpiry->addMonths(6);
             }
-            
+
             $user->save();
 
             Log::info('Subscription fulfilled successfully.', [

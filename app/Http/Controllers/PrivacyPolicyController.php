@@ -9,6 +9,14 @@ use Illuminate\Support\Facades\Validator;
 class PrivacyPolicyController extends Controller
 {
     // Public method for Flutter App
+        /**
+         * @OA\Get(
+         *     path="/privacy-policy",
+         *     summary="Get the privacy policy content for the Flutter app",
+         *     tags={"PrivacyPolicy"},
+         *     @OA\Response(response=200, description="Privacy policy content.")
+         * )
+         */
     public function get()
     {
         $content = PrivacyPolicy::firstOrCreate(
@@ -19,6 +27,23 @@ class PrivacyPolicyController extends Controller
     }
 
     // Admin method to update content
+        /**
+         * @OA\Put(
+         *     path="/privacy-policy",
+         *     summary="Update the privacy policy content (admin)",
+         *     tags={"PrivacyPolicy"},
+         *     @OA\RequestBody(
+         *         required=true,
+         *         @OA\JsonContent(
+         *             required={"title","content"},
+         *             @OA\Property(property="title", type="string"),
+         *             @OA\Property(property="content", type="string")
+         *         )
+         *     ),
+         *     @OA\Response(response=200, description="Privacy Policy updated successfully."),
+         *     @OA\Response(response=422, description="Validation error.")
+         * )
+         */
     public function update(Request $request)
     {
         $validator = Validator::make($request->all(), [

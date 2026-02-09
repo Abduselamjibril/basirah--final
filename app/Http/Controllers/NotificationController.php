@@ -21,6 +21,24 @@ class NotificationController extends Controller
         $this->messaging = $messaging;
     }
 
+        /**
+         * @OA\Post(
+         *     path="/notifications",
+         *     summary="Create a new notification and send push notification",
+         *     tags={"Notification"},
+         *     @OA\RequestBody(
+         *         required=true,
+         *         @OA\JsonContent(
+         *             required={"title","remark","duration"},
+         *             @OA\Property(property="title", type="string"),
+         *             @OA\Property(property="remark", type="string"),
+         *             @OA\Property(property="duration", type="integer")
+         *         )
+         *     ),
+         *     @OA\Response(response=201, description="Notification created and push sent."),
+         *     @OA\Response(response=422, description="Validation error")
+         * )
+         */
     public function createNotification(Request $request)
     {
         $validated = $request->validate([
@@ -69,7 +87,7 @@ class NotificationController extends Controller
             // --- END OF FIX ---
 
             $report = $this->messaging->sendMulticast($message, $tokens);
-            
+
             Log::info("Sent notification to " . count($tokens) . " unique devices. Successes: {$report->successes()->count()}");
 
         } catch (\Throwable $e) {
@@ -81,6 +99,14 @@ class NotificationController extends Controller
      * Get all active notifications.
      * This method first deactivates any notifications whose duration has run out.
      */
+        /**
+         * @OA\Get(
+         *     path="/notifications",
+         *     summary="Get all active notifications",
+         *     tags={"Notification"},
+         *     @OA\Response(response=200, description="List of active notifications")
+         * )
+         */
     public function index()
     {
         Notification::where('status', 'active')
@@ -94,6 +120,22 @@ class NotificationController extends Controller
         );
     }
 
+        /**
+         * @OA\Get(
+         *     path="/notifications/{id}",
+         *     summary="Get a single notification by ID",
+         *     tags={"Notification"},
+         *     @OA\Parameter(
+         *         name="id",
+         *         in="path",
+         *         required=true,
+         *         description="Notification ID",
+         *         @OA\Schema(type="integer")
+         *     ),
+         *     @OA\Response(response=200, description="Notification found"),
+         *     @OA\Response(response=404, description="Notification not found.")
+         * )
+         */
     public function show($id)
     {
         return response()->json(
@@ -101,6 +143,30 @@ class NotificationController extends Controller
         );
     }
 
+        /**
+         * @OA\Put(
+         *     path="/notifications/{id}",
+         *     summary="Update a notification",
+         *     tags={"Notification"},
+         *     @OA\Parameter(
+         *         name="id",
+         *         in="path",
+         *         required=true,
+         *         description="Notification ID",
+         *         @OA\Schema(type="integer")
+         *     ),
+         *     @OA\RequestBody(
+         *         required=false,
+         *         @OA\JsonContent(
+         *             @OA\Property(property="title", type="string"),
+         *             @OA\Property(property="remark", type="string"),
+         *             @OA\Property(property="duration", type="integer")
+         *         )
+         *     ),
+         *     @OA\Response(response=200, description="Notification updated successfully."),
+         *     @OA\Response(response=404, description="Notification not found.")
+         * )
+         */
     public function update(Request $request, $id)
     {
         $notification = Notification::findOrFail($id);
@@ -116,6 +182,22 @@ class NotificationController extends Controller
         return response()->json($notification);
     }
 
+        /**
+         * @OA\Delete(
+         *     path="/notifications/{id}",
+         *     summary="Delete a notification",
+         *     tags={"Notification"},
+         *     @OA\Parameter(
+         *         name="id",
+         *         in="path",
+         *         required=true,
+         *         description="Notification ID",
+         *         @OA\Schema(type="integer")
+         *     ),
+         *     @OA\Response(response=204, description="Notification deleted successfully."),
+         *     @OA\Response(response=404, description="Notification not found.")
+         * )
+         */
     public function destroy($id)
     {
         Notification::findOrFail($id)->delete();

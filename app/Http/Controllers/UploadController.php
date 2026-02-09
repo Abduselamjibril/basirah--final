@@ -7,6 +7,22 @@ use Illuminate\Support\Facades\Storage;
 
 class UploadController extends Controller
 {
+        /**
+         * @OA\Post(
+         *     path="/upload",
+         *     summary="Upload a file (audio/video)",
+         *     tags={"Upload"},
+         *     @OA\RequestBody(
+         *         required=true,
+         *         @OA\JsonContent(
+         *             required={"file"},
+         *             @OA\Property(property="file", type="string", format="binary")
+         *         )
+         *     ),
+         *     @OA\Response(response=200, description="File uploaded successfully. Returns file path."),
+         *     @OA\Response(response=422, description="Validation error.")
+         * )
+         */
     public function uploadFile(Request $request)
     {
         // Validate the uploaded file

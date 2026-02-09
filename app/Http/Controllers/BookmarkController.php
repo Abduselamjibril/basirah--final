@@ -31,6 +31,14 @@ class BookmarkController extends Controller
      * Get all bookmarks for the authenticated user.
      * This single endpoint returns all bookmarked items with the content eager-loaded.
      */
+        /**
+         * @OA\Get(
+         *     path="/bookmarks",
+         *     summary="Get all bookmarks for the authenticated user",
+         *     tags={"Bookmark"},
+         *     @OA\Response(response=200, description="List of bookmarks")
+         * )
+         */
     public function index(Request $request)
     {
         $user = $request->user();
@@ -53,6 +61,23 @@ class BookmarkController extends Controller
     /**
      * Toggle a bookmark for any piece of content (parent or episode).
      */
+        /**
+         * @OA\Post(
+         *     path="/bookmarks/toggle",
+         *     summary="Toggle a bookmark for any content",
+         *     tags={"Bookmark"},
+         *     @OA\RequestBody(
+         *         required=true,
+         *         @OA\JsonContent(
+         *             required={"type","id"},
+         *             @OA\Property(property="type", type="string"),
+         *             @OA\Property(property="id", type="integer")
+         *         )
+         *     ),
+         *     @OA\Response(response=200, description="Bookmark toggled successfully"),
+         *     @OA\Response(response=404, description="The selected item could not be found.")
+         * )
+         */
     public function toggle(Request $request)
     {
         $validated = $request->validate([

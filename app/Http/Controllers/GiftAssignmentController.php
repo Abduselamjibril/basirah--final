@@ -13,6 +13,24 @@ use Carbon\Carbon;
 class GiftAssignmentController extends Controller
 {
     // For React admin to assign a gift from a pool to a user
+        /**
+         * @OA\Post(
+         *     path="/gift-assignments/assign",
+         *     summary="Assign a gift from a pool to a user",
+         *     tags={"GiftAssignment"},
+         *     @OA\RequestBody(
+         *         required=true,
+         *         @OA\JsonContent(
+         *             required={"recipient_user_id","gift_purchase_id"},
+         *             @OA\Property(property="recipient_user_id", type="integer"),
+         *             @OA\Property(property="gift_purchase_id", type="integer")
+         *         )
+         *     ),
+         *     @OA\Response(response=200, description="Gift assigned successfully. The user is now subscribed."),
+         *     @OA\Response(response=400, description="Gift pool not active or no gifts remaining."),
+         *     @OA\Response(response=422, description="Validation error")
+         * )
+         */
     public function assign(Request $request)
     {
         $validator = \Validator::make($request->all(), [
@@ -33,7 +51,7 @@ class GiftAssignmentController extends Controller
         }
 
         // --- The Core Logic ---
-        
+
         // 1. Update the recipient's subscription
         $startDate = $recipient->subscription_expires_at && $recipient->subscription_expires_at->isFuture()
             ? $recipient->subscription_expires_at
@@ -63,7 +81,7 @@ class GiftAssignmentController extends Controller
             'recipient_id' => $recipient->id,
             'admin_id' => Auth::id()
         ]);
-        
+
         return response()->json(['message' => 'Gift assigned successfully. The user is now subscribed.']);
     }
 }

@@ -18,6 +18,14 @@ class PlaylistController extends Controller
     /**
      * Display a listing of the authenticated user's playlists.
      */
+        /**
+         * @OA\Get(
+         *     path="/playlists",
+         *     summary="List authenticated user's playlists",
+         *     tags={"Playlist"},
+         *     @OA\Response(response=200, description="List of playlists")
+         * )
+         */
     public function index(Request $request)
     {
         $playlists = $request->user()
@@ -25,13 +33,28 @@ class PlaylistController extends Controller
             ->withCount('items')
             ->latest()
             ->get();
-            
+
         return PlaylistResource::collection($playlists);
     }
 
     /**
      * Store a newly created playlist in storage for the authenticated user.
      */
+        /**
+         * @OA\Post(
+         *     path="/playlists",
+         *     summary="Create a new playlist",
+         *     tags={"Playlist"},
+         *     @OA\RequestBody(
+         *         required=true,
+         *         @OA\JsonContent(
+         *             required={"name"},
+         *             @OA\Property(property="name", type="string")
+         *         )
+         *     ),
+         *     @OA\Response(response=200, description="Playlist created")
+         * )
+         */
     public function store(Request $request)
     {
         $validated = $request->validate(['name' => 'required|string|max:255']);
@@ -44,6 +67,21 @@ class PlaylistController extends Controller
     /**
      * Display the specified playlist if the user is authorized.
      */
+        /**
+         * @OA\Get(
+         *     path="/playlists/{playlist}",
+         *     summary="Show a playlist",
+         *     tags={"Playlist"},
+         *     @OA\Parameter(
+         *         name="playlist",
+         *         in="path",
+         *         required=true,
+         *         description="Playlist ID",
+         *         @OA\Schema(type="integer")
+         *     ),
+         *     @OA\Response(response=200, description="Playlist details")
+         * )
+         */
     public function show(Request $request, Playlist $playlist)
     {
         // Manual authorization check
@@ -59,6 +97,28 @@ class PlaylistController extends Controller
     /**
      * Update the specified playlist in storage if the user is authorized.
      */
+        /**
+         * @OA\Put(
+         *     path="/playlists/{playlist}",
+         *     summary="Update a playlist",
+         *     tags={"Playlist"},
+         *     @OA\Parameter(
+         *         name="playlist",
+         *         in="path",
+         *         required=true,
+         *         description="Playlist ID",
+         *         @OA\Schema(type="integer")
+         *     ),
+         *     @OA\RequestBody(
+         *         required=true,
+         *         @OA\JsonContent(
+         *             required={"name"},
+         *             @OA\Property(property="name", type="string")
+         *         )
+         *     ),
+         *     @OA\Response(response=200, description="Playlist updated")
+         * )
+         */
     public function update(Request $request, Playlist $playlist)
     {
         // --- FIX APPLIED: Reverted to a manual check ---
@@ -75,6 +135,21 @@ class PlaylistController extends Controller
     /**
      * Remove the specified playlist from storage if the user is authorized.
      */
+        /**
+         * @OA\Delete(
+         *     path="/playlists/{playlist}",
+         *     summary="Delete a playlist",
+         *     tags={"Playlist"},
+         *     @OA\Parameter(
+         *         name="playlist",
+         *         in="path",
+         *         required=true,
+         *         description="Playlist ID",
+         *         @OA\Schema(type="integer")
+         *     ),
+         *     @OA\Response(response=204, description="Playlist deleted")
+         * )
+         */
     public function destroy(Request $request, Playlist $playlist)
     {
         // --- FIX APPLIED: Reverted to a manual check ---

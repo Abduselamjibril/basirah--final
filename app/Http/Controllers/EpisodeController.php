@@ -13,12 +13,51 @@ use App\Http\Resources\EpisodeResource;
 class EpisodeController extends Controller
 {
     // ... index, store, show, showById methods are unchanged ...
+        /**
+         * @OA\Get(
+         *     path="/api/courses/{courseId}/episodes",
+         *     tags={"Episodes"},
+         *     summary="Get all episodes for a course",
+         *     @OA\Parameter(
+         *         name="courseId",
+         *         in="path",
+         *         required=true,
+         *         @OA\Schema(type="integer")
+         *     ),
+         *     @OA\Response(response=200, description="List of episodes")
+         * )
+         */
     public function index($courseId)
     {
         $course = Course::with('episodes')->findOrFail($courseId);
         return EpisodeResource::collection($course->episodes);
     }
 
+        /**
+         * @OA\Post(
+         *     path="/api/courses/{courseId}/episodes",
+         *     tags={"Episodes"},
+         *     summary="Create a new episode for a course",
+         *     @OA\Parameter(
+         *         name="courseId",
+         *         in="path",
+         *         required=true,
+         *         @OA\Schema(type="integer")
+         *     ),
+         *     @OA\RequestBody(
+         *         required=true,
+         *         @OA\JsonContent(
+         *             required={"title"},
+         *             @OA\Property(property="title", type="string"),
+         *             @OA\Property(property="video", type="string", format="binary"),
+         *             @OA\Property(property="audio", type="string", format="binary"),
+         *             @OA\Property(property="youtube_link", type="string")
+         *         )
+         *     ),
+         *     @OA\Response(response=201, description="Episode created successfully."),
+         *     @OA\Response(response=422, description="Validation error")
+         * )
+         */
     public function store(Request $request, $courseId)
     {
         $course = Course::findOrFail($courseId);
@@ -40,12 +79,46 @@ class EpisodeController extends Controller
         return response()->json(['message' => 'Episode created successfully.', 'data' => new EpisodeResource($episode)], 201);
     }
 
+        /**
+         * @OA\Get(
+         *     path="/api/courses/{courseId}/episodes/{episodeId}",
+         *     tags={"Episodes"},
+         *     summary="Get a specific episode for a course",
+         *     @OA\Parameter(
+         *         name="courseId",
+         *         in="path",
+         *         required=true,
+         *         @OA\Schema(type="integer")
+         *     ),
+         *     @OA\Parameter(
+         *         name="episodeId",
+         *         in="path",
+         *         required=true,
+         *         @OA\Schema(type="integer")
+         *     ),
+         *     @OA\Response(response=200, description="Episode details")
+         * )
+         */
     public function show($courseId, $episodeId)
     {
         $episode = Episode::where('course_id', $courseId)->findOrFail($episodeId);
         return new EpisodeResource($episode);
     }
 
+        /**
+         * @OA\Get(
+         *     path="/api/episodes/{episodeId}",
+         *     tags={"Episodes"},
+         *     summary="Get a specific episode by ID",
+         *     @OA\Parameter(
+         *         name="episodeId",
+         *         in="path",
+         *         required=true,
+         *         @OA\Schema(type="integer")
+         *     ),
+         *     @OA\Response(response=200, description="Episode details")
+         * )
+         */
     public function showById($episodeId)
     {
         $episode = Episode::findOrFail($episodeId);
@@ -55,6 +128,36 @@ class EpisodeController extends Controller
     /**
      *  FIXED AND REFACTORED UPDATE METHOD
      */
+        /**
+         * @OA\Put(
+         *     path="/api/courses/{courseId}/episodes/{episodeId}",
+         *     tags={"Episodes"},
+         *     summary="Update a specific episode for a course",
+         *     @OA\Parameter(
+         *         name="courseId",
+         *         in="path",
+         *         required=true,
+         *         @OA\Schema(type="integer")
+         *     ),
+         *     @OA\Parameter(
+         *         name="episodeId",
+         *         in="path",
+         *         required=true,
+         *         @OA\Schema(type="integer")
+         *     ),
+         *     @OA\RequestBody(
+         *         required=false,
+         *         @OA\JsonContent(
+         *             @OA\Property(property="title", type="string"),
+         *             @OA\Property(property="video", type="string", format="binary"),
+         *             @OA\Property(property="audio", type="string", format="binary"),
+         *             @OA\Property(property="youtube_link", type="string")
+         *         )
+         *     ),
+         *     @OA\Response(response=200, description="Episode updated successfully."),
+         *     @OA\Response(response=404, description="Episode not found.")
+         * )
+         */
     public function update(Request $request, $courseId, $episodeId)
     {
         $episode = Episode::where('course_id', $courseId)->findOrFail($episodeId);
@@ -79,7 +182,7 @@ class EpisodeController extends Controller
             $updateData['video_path'] = $request->file('video')->store('episodes/videos', 'public');
             // Ensure youtube_link is cleared if a video is uploaded
             $updateData['youtube_link'] = null;
-        } 
+        }
         // Handle a youtube_link update only if a new video was NOT uploaded
         elseif ($request->filled('youtube_link')) {
              // If we're switching to a YouTube link, delete the old video file
@@ -88,7 +191,7 @@ class EpisodeController extends Controller
                 $updateData['video_path'] = null;
             }
         }
-        
+
         // Handle audio upload separately
         if ($request->hasFile('audio')) {
             // Delete the old audio file if it exists
@@ -104,12 +207,33 @@ class EpisodeController extends Controller
         $episode->update($updateData);
 
         return response()->json([
-            'message' => 'Episode updated successfully.', 
+            'message' => 'Episode updated successfully.',
             'data' => new EpisodeResource($episode->refresh())
         ], 200);
     }
 
     // ... destroy, lock, unlock, lockAll, unlockAll methods are unchanged ...
+        /**
+         * @OA\Delete(
+         *     path="/api/courses/{courseId}/episodes/{episodeId}",
+         *     tags={"Episodes"},
+         *     summary="Delete a specific episode for a course",
+         *     @OA\Parameter(
+         *         name="courseId",
+         *         in="path",
+         *         required=true,
+         *         @OA\Schema(type="integer")
+         *     ),
+         *     @OA\Parameter(
+         *         name="episodeId",
+         *         in="path",
+         *         required=true,
+         *         @OA\Schema(type="integer")
+         *     ),
+         *     @OA\Response(response=200, description="Episode deleted successfully."),
+         *     @OA\Response(response=404, description="Episode not found.")
+         * )
+         */
     public function destroy($courseId, $episodeId)
     {
         $episode = Episode::where('course_id', $courseId)->findOrFail($episodeId);
@@ -123,6 +247,27 @@ class EpisodeController extends Controller
         return response()->json(['message' => 'Episode deleted successfully.'], 200);
     }
 
+        /**
+         * @OA\Patch(
+         *     path="/api/courses/{courseId}/episodes/{episodeId}/lock",
+         *     tags={"Episodes"},
+         *     summary="Lock a specific episode for a course",
+         *     @OA\Parameter(
+         *         name="courseId",
+         *         in="path",
+         *         required=true,
+         *         @OA\Schema(type="integer")
+         *     ),
+         *     @OA\Parameter(
+         *         name="episodeId",
+         *         in="path",
+         *         required=true,
+         *         @OA\Schema(type="integer")
+         *     ),
+         *     @OA\Response(response=200, description="Episode locked."),
+         *     @OA\Response(response=404, description="Episode not found.")
+         * )
+         */
     public function lock($courseId, $episodeId)
     {
         $episode = Episode::where('course_id', $courseId)->findOrFail($episodeId);
@@ -131,6 +276,27 @@ class EpisodeController extends Controller
         return response()->json(['message' => 'Episode locked.', 'data' => new EpisodeResource($episode)]);
     }
 
+        /**
+         * @OA\Patch(
+         *     path="/api/courses/{courseId}/episodes/{episodeId}/unlock",
+         *     tags={"Episodes"},
+         *     summary="Unlock a specific episode for a course",
+         *     @OA\Parameter(
+         *         name="courseId",
+         *         in="path",
+         *         required=true,
+         *         @OA\Schema(type="integer")
+         *     ),
+         *     @OA\Parameter(
+         *         name="episodeId",
+         *         in="path",
+         *         required=true,
+         *         @OA\Schema(type="integer")
+         *     ),
+         *     @OA\Response(response=200, description="Episode unlocked."),
+         *     @OA\Response(response=404, description="Episode not found.")
+         * )
+         */
     public function unlock($courseId, $episodeId)
     {
         $episode = Episode::where('course_id', $courseId)->findOrFail($episodeId);
@@ -139,6 +305,20 @@ class EpisodeController extends Controller
         return response()->json(['message' => 'Episode unlocked.', 'data' => new EpisodeResource($episode)]);
     }
 
+        /**
+         * @OA\Patch(
+         *     path="/api/courses/{courseId}/episodes/lock-all",
+         *     tags={"Episodes"},
+         *     summary="Lock all episodes for a course",
+         *     @OA\Parameter(
+         *         name="courseId",
+         *         in="path",
+         *         required=true,
+         *         @OA\Schema(type="integer")
+         *     ),
+         *     @OA\Response(response=200, description="All episodes for the course have been locked.")
+         * )
+         */
     public function lockAll($courseId)
     {
         $course = Course::findOrFail($courseId);
@@ -146,6 +326,20 @@ class EpisodeController extends Controller
         return response()->json(['message' => 'All episodes for the course have been locked.']);
     }
 
+        /**
+         * @OA\Patch(
+         *     path="/api/courses/{courseId}/episodes/unlock-all",
+         *     tags={"Episodes"},
+         *     summary="Unlock all episodes for a course",
+         *     @OA\Parameter(
+         *         name="courseId",
+         *         in="path",
+         *         required=true,
+         *         @OA\Schema(type="integer")
+         *     ),
+         *     @OA\Response(response=200, description="All episodes for the course have been unlocked.")
+         * )
+         */
     public function unlockAll($courseId)
     {
         $course = Course::findOrFail($courseId);

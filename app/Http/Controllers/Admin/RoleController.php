@@ -12,20 +12,53 @@ use Illuminate\Validation\Rule;
 class RoleController extends Controller
 {
     // List all admin users
+        /**
+         * @OA\Get(
+         *     path="/admin/admin-users",
+         *     summary="List all admin users",
+         *     tags={"Role"},
+         *     @OA\Response(response=200, description="List of admin users")
+         * )
+         */
     public function index()
     {
         // Return users with their permissions eager-loaded
         $users = AdminUser::with('permissions:id,name,display_name')->get();
         return response()->json($users);
     }
-    
+
     // List all available permissions
+        /**
+         * @OA\Get(
+         *     path="/admin/permissions",
+         *     summary="List all available permissions",
+         *     tags={"Role"},
+         *     @OA\Response(response=200, description="List of permissions")
+         * )
+         */
     public function getPermissions()
     {
         return response()->json(Permission::all());
     }
 
     // Create a new regular admin user
+        /**
+         * @OA\Post(
+         *     path="/admin/admin-users",
+         *     summary="Create a new admin user",
+         *     tags={"Role"},
+         *     @OA\RequestBody(
+         *         required=true,
+         *         @OA\JsonContent(
+         *             required={"name","email","permissions"},
+         *             @OA\Property(property="name", type="string"),
+         *             @OA\Property(property="email", type="string", format="email"),
+         *             @OA\Property(property="permissions", type="array", @OA\Items(type="integer"))
+         *         )
+         *     ),
+         *     @OA\Response(response=201, description="Admin user created")
+         * )
+         */
     public function store(Request $request)
     {
         $request->validate([
@@ -48,6 +81,29 @@ class RoleController extends Controller
     }
 
     // Update only the permissions of a regular admin
+        /**
+         * @OA\Put(
+         *     path="/admin/admin-users/{user}/permissions",
+         *     summary="Update permissions of an admin user",
+         *     tags={"Role"},
+         *     @OA\Parameter(
+         *         name="user",
+         *         in="path",
+         *         required=true,
+         *         description="Admin user ID",
+         *         @OA\Schema(type="integer")
+         *     ),
+         *     @OA\RequestBody(
+         *         required=true,
+         *         @OA\JsonContent(
+         *             required={"permissions"},
+         *             @OA\Property(property="permissions", type="array", @OA\Items(type="integer"))
+         *         )
+         *     ),
+         *     @OA\Response(response=200, description="Permissions updated"),
+         *     @OA\Response(response=403, description="Cannot modify a super admin's permissions")
+         * )
+         */
     public function updatePermissions(Request $request, AdminUser $user)
     {
         if ($user->is_super_admin) {
@@ -65,6 +121,22 @@ class RoleController extends Controller
     }
 
     // Delete a regular admin user
+        /**
+         * @OA\Delete(
+         *     path="/admin/admin-users/{user}",
+         *     summary="Delete an admin user",
+         *     tags={"Role"},
+         *     @OA\Parameter(
+         *         name="user",
+         *         in="path",
+         *         required=true,
+         *         description="Admin user ID",
+         *         @OA\Schema(type="integer")
+         *     ),
+         *     @OA\Response(response=204, description="Admin user deleted"),
+         *     @OA\Response(response=403, description="Super admins cannot be deleted")
+         * )
+         */
     public function destroy(AdminUser $user)
     {
         if ($user->is_super_admin) {

@@ -24,7 +24,7 @@ class CommentaryResource extends JsonResource
         } elseif (auth()->guard('sanctum')->check()) {
             // If a user is logged in, check their subscription.
             $user = auth()->guard('sanctum')->user();
-            $hasFullAccess = $user ? $user->isSubscribedAndActive() : false;
+            $hasFullAccess = ($user instanceof \App\Models\User) ? $user->isSubscribedAndActive() : false;
         }
         // --- END OF FIX ---
 

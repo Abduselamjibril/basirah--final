@@ -12,12 +12,53 @@ use App\Http\Resources\StoryEpisodeResource; // Import new resource
 
 class StoryEpisodeController extends Controller
 {
+        /**
+         * @OA\Get(
+         *     path="/stories/{story_id}/episodes",
+         *     summary="Get all episodes for a story",
+         *     tags={"StoryEpisode"},
+         *     @OA\Parameter(
+         *         name="story_id",
+         *         in="path",
+         *         required=true,
+         *         description="Story ID",
+         *         @OA\Schema(type="integer")
+         *     ),
+         *     @OA\Response(response=200, description="List of story episodes.")
+         * )
+         */
     public function index(Story $story)
     {
         // Using the resource to transform the collection
         return StoryEpisodeResource::collection($story->storyEpisodes);
     }
 
+        /**
+         * @OA\Post(
+         *     path="/stories/{story_id}/episodes",
+         *     summary="Create a new episode for a story",
+         *     tags={"StoryEpisode"},
+         *     @OA\Parameter(
+         *         name="story_id",
+         *         in="path",
+         *         required=true,
+         *         description="Story ID",
+         *         @OA\Schema(type="integer")
+         *     ),
+         *     @OA\RequestBody(
+         *         required=true,
+         *         @OA\JsonContent(
+         *             required={"name"},
+         *             @OA\Property(property="name", type="string"),
+         *             @OA\Property(property="video", type="string", format="binary"),
+         *             @OA\Property(property="audio", type="string", format="binary"),
+         *             @OA\Property(property="youtube_link", type="string")
+         *         )
+         *     ),
+         *     @OA\Response(response=201, description="Story episode created successfully."),
+         *     @OA\Response(response=422, description="Validation error.")
+         * )
+         */
     public function store(Request $request, Story $story)
     {
         $validatedData = $request->validate([
@@ -45,17 +86,66 @@ class StoryEpisodeController extends Controller
         ], 201);
     }
 
+        /**
+         * @OA\Get(
+         *     path="/story-episodes/{id}",
+         *     summary="Get a single story episode by ID",
+         *     tags={"StoryEpisode"},
+         *     @OA\Parameter(
+         *         name="id",
+         *         in="path",
+         *         required=true,
+         *         description="Story Episode ID",
+         *         @OA\Schema(type="integer")
+         *     ),
+         *     @OA\Response(response=200, description="Story episode found."),
+         *     @OA\Response(response=404, description="Story episode not found.")
+         * )
+         */
     public function showEpisode(StoryEpisode $storyEpisode)
     {
         return new StoryEpisodeResource($storyEpisode);
     }
 
+        /**
+         * @OA\Get(
+         *     path="/story-episodes",
+         *     summary="Get all story episodes across all stories",
+         *     tags={"StoryEpisode"},
+         *     @OA\Response(response=200, description="List of all story episodes.")
+         * )
+         */
     public function getAllEpisodes()
     {
         $episodes = StoryEpisode::with('story')->get(); // Eager load story for context
         return StoryEpisodeResource::collection($episodes);
     }
 
+        /**
+         * @OA\Put(
+         *     path="/story-episodes/{id}",
+         *     summary="Update a story episode",
+         *     tags={"StoryEpisode"},
+         *     @OA\Parameter(
+         *         name="id",
+         *         in="path",
+         *         required=true,
+         *         description="Story Episode ID",
+         *         @OA\Schema(type="integer")
+         *     ),
+         *     @OA\RequestBody(
+         *         required=false,
+         *         @OA\JsonContent(
+         *             @OA\Property(property="name", type="string"),
+         *             @OA\Property(property="video", type="string", format="binary"),
+         *             @OA\Property(property="audio", type="string", format="binary"),
+         *             @OA\Property(property="youtube_link", type="string")
+         *         )
+         *     ),
+         *     @OA\Response(response=200, description="Story episode updated successfully."),
+         *     @OA\Response(response=404, description="Story episode not found.")
+         * )
+         */
     public function update(Request $request, StoryEpisode $storyEpisode)
     {
         $validatedData = $request->validate([
@@ -86,6 +176,22 @@ class StoryEpisodeController extends Controller
         ], 200);
     }
 
+        /**
+         * @OA\Delete(
+         *     path="/story-episodes/{id}",
+         *     summary="Delete a story episode",
+         *     tags={"StoryEpisode"},
+         *     @OA\Parameter(
+         *         name="id",
+         *         in="path",
+         *         required=true,
+         *         description="Story Episode ID",
+         *         @OA\Schema(type="integer")
+         *     ),
+         *     @OA\Response(response=200, description="Story Episode deleted successfully."),
+         *     @OA\Response(response=404, description="Story episode not found.")
+         * )
+         */
     public function destroy(StoryEpisode $storyEpisode)
     {
         if ($storyEpisode->video) Storage::disk('public')->delete($storyEpisode->video);
@@ -95,6 +201,22 @@ class StoryEpisodeController extends Controller
         return response()->json(['message' => 'Story Episode deleted successfully'], 200);
     }
 
+        /**
+         * @OA\Patch(
+         *     path="/story-episodes/{id}/lock",
+         *     summary="Lock a story episode",
+         *     tags={"StoryEpisode"},
+         *     @OA\Parameter(
+         *         name="id",
+         *         in="path",
+         *         required=true,
+         *         description="Story Episode ID",
+         *         @OA\Schema(type="integer")
+         *     ),
+         *     @OA\Response(response=200, description="Story Episode locked successfully."),
+         *     @OA\Response(response=404, description="Story episode not found.")
+         * )
+         */
     public function lock(StoryEpisode $storyEpisode)
     {
         $storyEpisode->is_locked = true;
@@ -106,6 +228,22 @@ class StoryEpisodeController extends Controller
         ]);
     }
 
+        /**
+         * @OA\Patch(
+         *     path="/story-episodes/{id}/unlock",
+         *     summary="Unlock a story episode",
+         *     tags={"StoryEpisode"},
+         *     @OA\Parameter(
+         *         name="id",
+         *         in="path",
+         *         required=true,
+         *         description="Story Episode ID",
+         *         @OA\Schema(type="integer")
+         *     ),
+         *     @OA\Response(response=200, description="Story Episode unlocked successfully."),
+         *     @OA\Response(response=404, description="Story episode not found.")
+         * )
+         */
     public function unlock(StoryEpisode $storyEpisode)
     {
         $storyEpisode->is_locked = false;

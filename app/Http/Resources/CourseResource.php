@@ -24,7 +24,7 @@ class CourseResource extends JsonResource
         } elseif (auth()->guard('sanctum')->check()) {
             // For regular users, check their subscription status.
             $user = auth()->guard('sanctum')->user();
-            $hasFullAccess = $user ? $user->isSubscribedAndActive() : false;
+            $hasFullAccess = ($user instanceof \App\Models\User) ? $user->isSubscribedAndActive() : false;
         }
         // --- END OF FIX ---
 
@@ -34,7 +34,7 @@ class CourseResource extends JsonResource
             'description' => $this->description,
             'category' => $this->category,
             'image_path' => $this->image_path ? Storage::disk('public')->url($this->image_path) : null,
-            
+
             // Provide both the raw premium status and the dynamic locked status.
             // 'is_premium' is for the admin panel's toggles.
             'is_premium' => (bool) $this->is_premium,

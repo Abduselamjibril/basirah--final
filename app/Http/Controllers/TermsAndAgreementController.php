@@ -9,6 +9,14 @@ use Illuminate\Support\Facades\Validator;
 class TermsAndAgreementController extends Controller
 {
     // Public method for Flutter App
+        /**
+         * @OA\Get(
+         *     path="/terms-and-agreement",
+         *     summary="Get the terms and agreement content for the Flutter app",
+         *     tags={"TermsAndAgreement"},
+         *     @OA\Response(response=200, description="Terms and agreement content.")
+         * )
+         */
     public function get()
     {
         $content = TermsAndAgreement::firstOrCreate(
@@ -19,6 +27,23 @@ class TermsAndAgreementController extends Controller
     }
 
     // Admin method to update content
+        /**
+         * @OA\Put(
+         *     path="/terms-and-agreement",
+         *     summary="Update the terms and agreement content (admin)",
+         *     tags={"TermsAndAgreement"},
+         *     @OA\RequestBody(
+         *         required=true,
+         *         @OA\JsonContent(
+         *             required={"title","content"},
+         *             @OA\Property(property="title", type="string"),
+         *             @OA\Property(property="content", type="string")
+         *         )
+         *     ),
+         *     @OA\Response(response=200, description="Terms and Agreement updated successfully."),
+         *     @OA\Response(response=422, description="Validation error.")
+         * )
+         */
     public function update(Request $request)
     {
         $validator = Validator::make($request->all(), [

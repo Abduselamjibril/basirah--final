@@ -1,5 +1,4 @@
 <?php
-
 namespace App\Http\Controllers;
 
 use App\Models\User;
@@ -9,6 +8,7 @@ use App\Models\Story;
 use App\Models\Commentary;
 use App\Models\DeeperLook;
 
+
 class DashboardController extends Controller
 {
     /**
@@ -16,6 +16,14 @@ class DashboardController extends Controller
      *
      * @return \Illuminate\Http\JsonResponse
      */
+        /**
+         * @OA\Get(
+         *     path="/dashboard/stats",
+         *     summary="Fetch aggregate statistics for the admin dashboard",
+         *     tags={"Dashboard"},
+         *     @OA\Response(response=200, description="Dashboard statistics returned")
+         * )
+         */
     public function getStats()
     {
         $stats = [

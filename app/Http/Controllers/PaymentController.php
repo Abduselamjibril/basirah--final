@@ -15,6 +15,24 @@ class PaymentController extends Controller
     /**
      * Handles the initiation of a payment through either Stripe or Chapa.
      */
+        /**
+         * @OA\Post(
+         *     path="/payments/initiate",
+         *     summary="Initiate a payment through Stripe or Chapa",
+         *     tags={"Payment"},
+         *     @OA\RequestBody(
+         *         required=true,
+         *         @OA\JsonContent(
+         *             required={"gateway","plan"},
+         *             @OA\Property(property="gateway", type="string", enum={"stripe","chapa"}),
+         *             @OA\Property(property="plan", type="string", enum={"six_month","yearly"})
+         *         )
+         *     ),
+         *     @OA\Response(response=200, description="Payment initiation successful, returns checkout URL."),
+         *     @OA\Response(response=422, description="Validation error or invalid gateway."),
+         *     @OA\Response(response=500, description="Payment processing error.")
+         * )
+         */
     public function initiatePayment(Request $request)
     {
         $validator = \Validator::make($request->all(), [

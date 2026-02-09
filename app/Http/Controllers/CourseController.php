@@ -6,10 +6,27 @@ use App\Models\Course;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 
+/**
+ * @OA\Tag(
+ *     name="Courses",
+ *     description="API Endpoints for Courses"
+ * )
+ */
 class CourseController extends Controller
 {
     /**
      * The index method fetches courses with their episode counts.
+     */
+    /**
+     * @OA\Get(
+     *     path="/api/courses",
+     *     tags={"Courses"},
+     *     summary="Get all courses",
+     *     @OA\Response(
+     *         response=200,
+     *         description="List of courses"
+     *     )
+     * )
      */
     public function index()
     {
@@ -34,6 +51,30 @@ class CourseController extends Controller
 
     /**
      * The store method creates a new course.
+     */
+    /**
+     * @OA\Post(
+     *     path="/api/courses",
+     *     tags={"Courses"},
+     *     summary="Create a new course",
+     *     @OA\RequestBody(
+     *         required=true,
+     *         @OA\MediaType(
+     *             mediaType="multipart/form-data",
+     *             @OA\Schema(
+     *                 required={"name","description","image","category"},
+     *                 @OA\Property(property="name", type="string"),
+     *                 @OA\Property(property="description", type="string"),
+     *                 @OA\Property(property="image", type="string", format="binary"),
+     *                 @OA\Property(property="category", type="string")
+     *             )
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=201,
+     *         description="Course created successfully"
+     *     )
+     * )
      */
     public function store(Request $request)
     {
@@ -74,6 +115,23 @@ class CourseController extends Controller
     /**
      * The show method fetches a single course.
      */
+    /**
+     * @OA\Get(
+     *     path="/api/courses/{id}",
+     *     tags={"Courses"},
+     *     summary="Get a single course",
+     *     @OA\Parameter(
+     *         name="id",
+     *         in="path",
+     *         required=true,
+     *         @OA\Schema(type="integer")
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Course details"
+     *     )
+     * )
+     */
     public function show($id)
     {
         $course = Course::withCount('episodes')->findOrFail($id);
@@ -97,6 +155,35 @@ class CourseController extends Controller
     /**
      * The update method updates an existing course.
      */
+    /**
+     * @OA\Put(
+     *     path="/api/courses/{id}",
+     *     tags={"Courses"},
+     *     summary="Update a course",
+     *     @OA\Parameter(
+     *         name="id",
+     *         in="path",
+     *         required=true,
+     *         @OA\Schema(type="integer")
+     *     ),
+     *     @OA\RequestBody(
+     *         required=true,
+     *         @OA\MediaType(
+     *             mediaType="multipart/form-data",
+     *             @OA\Schema(
+     *                 @OA\Property(property="name", type="string"),
+     *                 @OA\Property(property="description", type="string"),
+     *                 @OA\Property(property="image", type="string", format="binary"),
+     *                 @OA\Property(property="category", type="string")
+     *             )
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Course updated successfully"
+     *     )
+     * )
+     */
     public function update(Request $request, $id)
     {
         $course = Course::findOrFail($id);
@@ -107,9 +194,9 @@ class CourseController extends Controller
             'image' => 'nullable|image|mimes:jpeg,png,jpg,gif,svg,png|max:10240',
             'category' => 'sometimes|required|string|in:Introduction to Quran,Messages in Quran',
         ]);
-        
+
         $courseData = $request->only(['name', 'description', 'category']);
-        
+
         if ($request->hasFile('image')) {
             if ($course->image_path) {
                 Storage::disk('public')->delete($course->image_path);
@@ -138,6 +225,23 @@ class CourseController extends Controller
         ], 200);
     }
 
+    /**
+     * @OA\Delete(
+     *     path="/api/courses/{id}",
+     *     tags={"Courses"},
+     *     summary="Delete a course",
+     *     @OA\Parameter(
+     *         name="id",
+     *         in="path",
+     *         required=true,
+     *         @OA\Schema(type="integer")
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Course deleted successfully"
+     *     )
+     * )
+     */
     public function destroy($id)
     {
         $course = Course::findOrFail($id);
@@ -171,7 +275,7 @@ class CourseController extends Controller
         $course->is_premium = true;
         $course->save();
         $course->episodes()->update(['is_locked' => true]);
-        
+
         return response()->json([
             'message' => 'Course locked and set to premium.',
             'data' => $this->transformCourseForResponse($course)
@@ -184,7 +288,7 @@ class CourseController extends Controller
         $course->is_premium = false;
         $course->save();
         $course->episodes()->update(['is_locked' => false]);
-        
+
         return response()->json([
             'message' => 'Course unlocked and set to free.',
             'data' => $this->transformCourseForResponse($course)

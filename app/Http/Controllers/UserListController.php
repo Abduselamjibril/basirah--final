@@ -8,6 +8,14 @@ use Illuminate\Http\Request;
 class UserListController extends Controller
 {
     // Fetch all users
+        /**
+         * @OA\Get(
+         *     path="/users",
+         *     summary="Fetch all users",
+         *     tags={"UserList"},
+         *     @OA\Response(response=200, description="List of users.")
+         * )
+         */
     public function index()
     {
         // You can choose to return only the fields you want to display
@@ -15,6 +23,22 @@ class UserListController extends Controller
     }
 
     // Delete a user
+        /**
+         * @OA\Delete(
+         *     path="/users/{id}",
+         *     summary="Delete a user",
+         *     tags={"UserList"},
+         *     @OA\Parameter(
+         *         name="id",
+         *         in="path",
+         *         required=true,
+         *         description="User ID",
+         *         @OA\Schema(type="integer")
+         *     ),
+         *     @OA\Response(response=204, description="User deleted successfully."),
+         *     @OA\Response(response=404, description="User not found.")
+         * )
+         */
     public function destroy($id)
     {
         $user = User::findOrFail($id);

@@ -10,6 +10,22 @@ class FcmController extends Controller
     /**
      * Update the FCM token for the authenticated user.
      */
+        /**
+         * @OA\Post(
+         *     path="/fcm/update-token",
+         *     summary="Update the FCM token for the authenticated user",
+         *     tags={"Fcm"},
+         *     @OA\RequestBody(
+         *         required=true,
+         *         @OA\JsonContent(
+         *             required={"fcm_token"},
+         *             @OA\Property(property="fcm_token", type="string")
+         *         )
+         *     ),
+         *     @OA\Response(response=200, description="FCM token updated successfully."),
+         *     @OA\Response(response=401, description="User not authenticated.")
+         * )
+         */
     public function updateToken(Request $request)
     {
         $request->validate([

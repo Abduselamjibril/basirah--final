@@ -21,7 +21,7 @@ class StoryResource extends JsonResource
             $hasFullAccess = true;
         } elseif (auth()->guard('sanctum')->check()) {
             $user = auth()->guard('sanctum')->user();
-            $hasFullAccess = $user ? $user->isSubscribedAndActive() : false;
+            $hasFullAccess = ($user instanceof \App\Models\User) ? $user->isSubscribedAndActive() : false;
         }
         // --- YOUR ORIGINAL LOGIC IS 100% PRESERVED ---
 

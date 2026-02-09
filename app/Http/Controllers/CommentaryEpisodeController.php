@@ -14,6 +14,21 @@ class CommentaryEpisodeController extends Controller
     /**
      * Display a listing of the episodes for a specific commentary.
      */
+        /**
+         * @OA\Get(
+         *     path="/commentaries/{commentary}/episodes",
+         *     summary="Get all episodes for a specific commentary",
+         *     tags={"CommentaryEpisode"},
+         *     @OA\Parameter(
+         *         name="commentary",
+         *         in="path",
+         *         required=true,
+         *         description="Commentary ID",
+         *         @OA\Schema(type="integer")
+         *     ),
+         *     @OA\Response(response=200, description="List of episodes")
+         * )
+         */
     public function index(Commentary $commentary)
     {
         // Using the resource to transform the collection, ordered by creation date.
@@ -23,6 +38,32 @@ class CommentaryEpisodeController extends Controller
     /**
      * Store a newly created episode in storage for a specific commentary.
      */
+        /**
+         * @OA\Post(
+         *     path="/commentaries/{commentary}/episodes",
+         *     summary="Create a new episode for a specific commentary",
+         *     tags={"CommentaryEpisode"},
+         *     @OA\Parameter(
+         *         name="commentary",
+         *         in="path",
+         *         required=true,
+         *         description="Commentary ID",
+         *         @OA\Schema(type="integer")
+         *     ),
+         *     @OA\RequestBody(
+         *         required=true,
+         *         @OA\JsonContent(
+         *             required={"title"},
+         *             @OA\Property(property="title", type="string"),
+         *             @OA\Property(property="video", type="string", format="binary"),
+         *             @OA\Property(property="audio", type="string", format="binary"),
+         *             @OA\Property(property="youtube_link", type="string")
+         *         )
+         *     ),
+         *     @OA\Response(response=201, description="Commentary episode created successfully."),
+         *     @OA\Response(response=422, description="Validation error")
+         * )
+         */
     public function store(Request $request, Commentary $commentary)
     {
         $validatedData = $request->validate([
@@ -54,6 +95,28 @@ class CommentaryEpisodeController extends Controller
      * Display the specified episode.
      * The check to see if the episode belongs to the commentary is now handled by scopeBindings() in the route.
      */
+        /**
+         * @OA\Get(
+         *     path="/commentaries/{commentary}/episodes/{episode}",
+         *     summary="Get a specific episode for a commentary",
+         *     tags={"CommentaryEpisode"},
+         *     @OA\Parameter(
+         *         name="commentary",
+         *         in="path",
+         *         required=true,
+         *         description="Commentary ID",
+         *         @OA\Schema(type="integer")
+         *     ),
+         *     @OA\Parameter(
+         *         name="episode",
+         *         in="path",
+         *         required=true,
+         *         description="Episode ID",
+         *         @OA\Schema(type="integer")
+         *     ),
+         *     @OA\Response(response=200, description="Episode found")
+         * )
+         */
     public function show(Commentary $commentary, CommentaryEpisode $episode)
     {
         return new CommentaryEpisodeResource($episode);
@@ -63,6 +126,38 @@ class CommentaryEpisodeController extends Controller
      * Update the specified episode in storage.
      * The check to see if the episode belongs to the commentary is now handled by scopeBindings() in the route.
      */
+        /**
+         * @OA\Put(
+         *     path="/commentaries/{commentary}/episodes/{episode}",
+         *     summary="Update a specific episode for a commentary",
+         *     tags={"CommentaryEpisode"},
+         *     @OA\Parameter(
+         *         name="commentary",
+         *         in="path",
+         *         required=true,
+         *         description="Commentary ID",
+         *         @OA\Schema(type="integer")
+         *     ),
+         *     @OA\Parameter(
+         *         name="episode",
+         *         in="path",
+         *         required=true,
+         *         description="Episode ID",
+         *         @OA\Schema(type="integer")
+         *     ),
+         *     @OA\RequestBody(
+         *         required=false,
+         *         @OA\JsonContent(
+         *             @OA\Property(property="title", type="string"),
+         *             @OA\Property(property="video", type="string", format="binary"),
+         *             @OA\Property(property="audio", type="string", format="binary"),
+         *             @OA\Property(property="youtube_link", type="string")
+         *         )
+         *     ),
+         *     @OA\Response(response=200, description="Commentary episode updated successfully."),
+         *     @OA\Response(response=404, description="Episode not found.")
+         * )
+         */
     public function update(Request $request, Commentary $commentary, CommentaryEpisode $episode)
     {
         $request->validate([
@@ -101,6 +196,29 @@ class CommentaryEpisodeController extends Controller
      * Remove the specified episode from storage.
      * The check to see if the episode belongs to the commentary is now handled by scopeBindings() in the route.
      */
+        /**
+         * @OA\Delete(
+         *     path="/commentaries/{commentary}/episodes/{episode}",
+         *     summary="Delete a specific episode for a commentary",
+         *     tags={"CommentaryEpisode"},
+         *     @OA\Parameter(
+         *         name="commentary",
+         *         in="path",
+         *         required=true,
+         *         description="Commentary ID",
+         *         @OA\Schema(type="integer")
+         *     ),
+         *     @OA\Parameter(
+         *         name="episode",
+         *         in="path",
+         *         required=true,
+         *         description="Episode ID",
+         *         @OA\Schema(type="integer")
+         *     ),
+         *     @OA\Response(response=200, description="Commentary Episode deleted successfully"),
+         *     @OA\Response(response=404, description="Episode not found.")
+         * )
+         */
     public function destroy(Commentary $commentary, CommentaryEpisode $episode)
     {
         if ($episode->video) {
@@ -118,6 +236,29 @@ class CommentaryEpisodeController extends Controller
      * Lock the specified episode.
      * The check to see if the episode belongs to the commentary is now handled by scopeBindings() in the route.
      */
+        /**
+         * @OA\Patch(
+         *     path="/commentaries/{commentary}/episodes/{episode}/lock",
+         *     summary="Lock a specific episode for a commentary",
+         *     tags={"CommentaryEpisode"},
+         *     @OA\Parameter(
+         *         name="commentary",
+         *         in="path",
+         *         required=true,
+         *         description="Commentary ID",
+         *         @OA\Schema(type="integer")
+         *     ),
+         *     @OA\Parameter(
+         *         name="episode",
+         *         in="path",
+         *         required=true,
+         *         description="Episode ID",
+         *         @OA\Schema(type="integer")
+         *     ),
+         *     @OA\Response(response=200, description="Commentary Episode locked successfully."),
+         *     @OA\Response(response=404, description="Episode not found.")
+         * )
+         */
     public function lock(Commentary $commentary, CommentaryEpisode $episode)
     {
         $episode->is_locked = true;
@@ -133,6 +274,29 @@ class CommentaryEpisodeController extends Controller
      * Unlock the specified episode.
      * The check to see if the episode belongs to the commentary is now handled by scopeBindings() in the route.
      */
+        /**
+         * @OA\Patch(
+         *     path="/commentaries/{commentary}/episodes/{episode}/unlock",
+         *     summary="Unlock a specific episode for a commentary",
+         *     tags={"CommentaryEpisode"},
+         *     @OA\Parameter(
+         *         name="commentary",
+         *         in="path",
+         *         required=true,
+         *         description="Commentary ID",
+         *         @OA\Schema(type="integer")
+         *     ),
+         *     @OA\Parameter(
+         *         name="episode",
+         *         in="path",
+         *         required=true,
+         *         description="Episode ID",
+         *         @OA\Schema(type="integer")
+         *     ),
+         *     @OA\Response(response=200, description="Commentary Episode unlocked successfully."),
+         *     @OA\Response(response=404, description="Episode not found.")
+         * )
+         */
     public function unlock(Commentary $commentary, CommentaryEpisode $episode)
     {
         $episode->is_locked = false;

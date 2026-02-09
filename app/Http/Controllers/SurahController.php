@@ -9,6 +9,14 @@ use App\Http\Resources\SurahResource; // Import new resource
 
 class SurahController extends Controller
 {
+        /**
+         * @OA\Get(
+         *     path="/surahs",
+         *     summary="Get all surahs with episodes",
+         *     tags={"Surah"},
+         *     @OA\Response(response=200, description="List of surahs.")
+         * )
+         */
     public function index()
     {
         $surahs = Surah::with('episodes')->get();
@@ -16,6 +24,22 @@ class SurahController extends Controller
         return SurahResource::collection($surahs);
     }
 
+        /**
+         * @OA\Get(
+         *     path="/surahs/{id}",
+         *     summary="Get a single surah by ID",
+         *     tags={"Surah"},
+         *     @OA\Parameter(
+         *         name="id",
+         *         in="path",
+         *         required=true,
+         *         description="Surah ID",
+         *         @OA\Schema(type="integer")
+         *     ),
+         *     @OA\Response(response=200, description="Surah found."),
+         *     @OA\Response(response=404, description="Surah not found.")
+         * )
+         */
     public function show($id)
     {
         $surah = Surah::with('episodes')->find($id);
@@ -26,6 +50,25 @@ class SurahController extends Controller
         return new SurahResource($surah);
     }
 
+        /**
+         * @OA\Post(
+         *     path="/surahs",
+         *     summary="Create a new surah",
+         *     tags={"Surah"},
+         *     @OA\RequestBody(
+         *         required=true,
+         *         @OA\JsonContent(
+         *             required={"name"},
+         *             @OA\Property(property="name", type="string"),
+         *             @OA\Property(property="image", type="string", format="binary"),
+         *             @OA\Property(property="description", type="string"),
+         *             @OA\Property(property="is_premium", type="boolean")
+         *         )
+         *     ),
+         *     @OA\Response(response=201, description="Surah created successfully."),
+         *     @OA\Response(response=422, description="Validation error.")
+         * )
+         */
     public function store(Request $request)
     {
         // Validation logic needs to be adapted for file uploads in API context
@@ -53,6 +96,31 @@ class SurahController extends Controller
         ], 201);
     }
 
+        /**
+         * @OA\Put(
+         *     path="/surahs/{id}",
+         *     summary="Update a surah",
+         *     tags={"Surah"},
+         *     @OA\Parameter(
+         *         name="id",
+         *         in="path",
+         *         required=true,
+         *         description="Surah ID",
+         *         @OA\Schema(type="integer")
+         *     ),
+         *     @OA\RequestBody(
+         *         required=false,
+         *         @OA\JsonContent(
+         *             @OA\Property(property="name", type="string"),
+         *             @OA\Property(property="image", type="string", format="binary"),
+         *             @OA\Property(property="description", type="string"),
+         *             @OA\Property(property="is_premium", type="boolean")
+         *         )
+         *     ),
+         *     @OA\Response(response=200, description="Surah updated successfully."),
+         *     @OA\Response(response=404, description="Surah not found.")
+         * )
+         */
     public function update(Request $request, $id)
     {
         $surah = Surah::findOrFail($id);
@@ -81,6 +149,22 @@ class SurahController extends Controller
         ], 200);
     }
 
+        /**
+         * @OA\Delete(
+         *     path="/surahs/{id}",
+         *     summary="Delete a surah",
+         *     tags={"Surah"},
+         *     @OA\Parameter(
+         *         name="id",
+         *         in="path",
+         *         required=true,
+         *         description="Surah ID",
+         *         @OA\Schema(type="integer")
+         *     ),
+         *     @OA\Response(response=200, description="Surah deleted successfully."),
+         *     @OA\Response(response=404, description="Surah not found.")
+         * )
+         */
     public function destroy($id)
     {
         $surah = Surah::findOrFail($id);
@@ -92,6 +176,22 @@ class SurahController extends Controller
         return response()->json(['message' => 'Surah deleted successfully.'], 200);
     }
 
+        /**
+         * @OA\Patch(
+         *     path="/surahs/{id}/lock",
+         *     summary="Lock a surah and set it to premium",
+         *     tags={"Surah"},
+         *     @OA\Parameter(
+         *         name="id",
+         *         in="path",
+         *         required=true,
+         *         description="Surah ID",
+         *         @OA\Schema(type="integer")
+         *     ),
+         *     @OA\Response(response=200, description="Surah locked and set to premium."),
+         *     @OA\Response(response=404, description="Surah not found.")
+         * )
+         */
     public function lock($id)
     {
         $surah = Surah::findOrFail($id);
@@ -105,6 +205,22 @@ class SurahController extends Controller
         ]);
     }
 
+        /**
+         * @OA\Patch(
+         *     path="/surahs/{id}/unlock",
+         *     summary="Unlock a surah and set it to free",
+         *     tags={"Surah"},
+         *     @OA\Parameter(
+         *         name="id",
+         *         in="path",
+         *         required=true,
+         *         description="Surah ID",
+         *         @OA\Schema(type="integer")
+         *     ),
+         *     @OA\Response(response=200, description="Surah unlocked and set to free."),
+         *     @OA\Response(response=404, description="Surah not found.")
+         * )
+         */
     public function unlock($id)
     {
         $surah = Surah::findOrFail($id);
