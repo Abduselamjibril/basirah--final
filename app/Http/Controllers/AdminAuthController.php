@@ -5,38 +5,48 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use App\Models\AdminUser;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Validation\Rule; // <-- Import this
+use Illuminate\Validation\Rule;
+use OpenApi\Attributes as OA;
 
 class AdminAuthController extends Controller
 {
-    // ... login method (no change) ...
-        /**
-         * @OA\Post(
-         *     path="/admin/login",
-         *     summary="Admin login",
-         *     tags={"AdminAuth"},
-         *     @OA\RequestBody(
-         *         required=true,
-         *         @OA\JsonContent(
-         *             required={"email","password"},
-         *             @OA\Property(property="email", type="string", format="email"),
-         *             @OA\Property(property="password", type="string")
-         *         )
-         *     ),
-         *     @OA\Response(response=200, description="Login successful"),
-         *     @OA\Response(response=401, description="Invalid credentials")
-         * )
-         */
+    #[OA\Post(
+        path: '/admin/login',
+        summary: 'Admin login',
+        tags: ['AdminAuth'],
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\JsonContent(
+                required: ['email', 'password'],
+                properties: [
+                    new OA\Property(property: 'email', type: 'string', format: 'email'),
+                    new OA\Property(property: 'password', type: 'string')
+                ]
+            )
+        ),
+        responses: [
+            new OA\Response(response: 200, description: 'Login successful'),
+            new OA\Response(response: 401, description: 'Invalid credentials')
+        ]
+    )]
     public function login(Request $request)
     {
         $credentials = $request->only('email', 'password');
         if (!$token = auth(guard: 'admin')->attempt($credentials)) {
             return response()->json(['message' => 'Invalid credentials'], 401);
         }
-        return response()->json(['message' => 'Login successful', 'token' => $token,]);
+        return response()->json(['message' => 'Login successful', 'token' => $token]);
     }
 
-    // Get Admin Profile - Updated to load permissions
+    #[OA\Get(
+        path: '/admin/profile',
+        summary: 'Get admin profile',
+        tags: ['AdminAuth'],
+        responses: [
+            new OA\Response(response: 200, description: 'Admin profile returned'),
+            new OA\Response(response: 401, description: 'Unauthorized')
+        ]
+    )]
     public function profile()
     {
         $user = auth('admin')->user();
@@ -46,17 +56,26 @@ class AdminAuthController extends Controller
         $user->load('permissions:id,name,display_name');
         return response()->json($user);
     }
-        /**
-         * @OA\Get(
-         *     path="/admin/profile",
-         *     summary="Get admin profile",
-         *     tags={"AdminAuth"},
-         *     @OA\Response(response=200, description="Admin profile returned"),
-         *     @OA\Response(response=401, description="Unauthorized")
-         * )
-         */
 
-    // NEW: Update own profile (for Super Admins)
+    #[OA\Put(
+        path: '/admin/profile',
+        summary: 'Update admin profile (Super Admin only)',
+        tags: ['AdminAuth'],
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\JsonContent(
+                required: ['name', 'email'],
+                properties: [
+                    new OA\Property(property: 'name', type: 'string'),
+                    new OA\Property(property: 'email', type: 'string', format: 'email')
+                ]
+            )
+        ),
+        responses: [
+            new OA\Response(response: 200, description: 'Profile updated'),
+            new OA\Response(response: 403, description: 'Only super admins can edit their profile.')
+        ]
+    )]
     public function updateProfile(Request $request)
     {
         /** @var \App\Models\AdminUser $user */
@@ -82,25 +101,27 @@ class AdminAuthController extends Controller
 
         return response()->json(['message' => 'Profile updated successfully.', 'user' => $user]);
     }
-        /**
-         * @OA\Put(
-         *     path="/admin/profile",
-         *     summary="Update admin profile (Super Admin only)",
-         *     tags={"AdminAuth"},
-         *     @OA\RequestBody(
-         *         required=true,
-         *         @OA\JsonContent(
-         *             required={"name","email"},
-         *             @OA\Property(property="name", type="string"),
-         *             @OA\Property(property="email", type="string", format="email")
-         *         )
-         *     ),
-         *     @OA\Response(response=200, description="Profile updated"),
-         *     @OA\Response(response=403, description="Only super admins can edit their profile.")
-         * )
-         */
 
-    // ... changePassword and logout methods (no change) ...
+    #[OA\Post(
+        path: '/admin/change-password',
+        summary: 'Change admin password',
+        tags: ['AdminAuth'],
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\JsonContent(
+                required: ['current_password', 'new_password', 'new_password_confirmation'],
+                properties: [
+                    new OA\Property(property: 'current_password', type: 'string'),
+                    new OA\Property(property: 'new_password', type: 'string'),
+                    new OA\Property(property: 'new_password_confirmation', type: 'string')
+                ]
+            )
+        ),
+        responses: [
+            new OA\Response(response: 200, description: 'Password updated successfully'),
+            new OA\Response(response: 400, description: 'Current password is incorrect')
+        ]
+    )]
     public function changePassword(Request $request)
     {
         $request->validate([
@@ -115,36 +136,18 @@ class AdminAuthController extends Controller
         $admin->update(['password' => Hash::make($request->new_password)]);
         return response()->json(['message' => 'Password updated successfully']);
     }
-        /**
-         * @OA\Post(
-         *     path="/admin/change-password",
-         *     summary="Change admin password",
-         *     tags={"AdminAuth"},
-         *     @OA\RequestBody(
-         *         required=true,
-         *         @OA\JsonContent(
-         *             required={"current_password","new_password","new_password_confirmation"},
-         *             @OA\Property(property="current_password", type="string"),
-         *             @OA\Property(property="new_password", type="string"),
-         *             @OA\Property(property="new_password_confirmation", type="string")
-         *         )
-         *     ),
-         *     @OA\Response(response=200, description="Password updated successfully"),
-         *     @OA\Response(response=400, description="Current password is incorrect")
-         * )
-         */
 
+    #[OA\Post(
+        path: '/admin/logout',
+        summary: 'Admin logout',
+        tags: ['AdminAuth'],
+        responses: [
+            new OA\Response(response: 200, description: 'Logged out successfully')
+        ]
+    )]
     public function logout()
     {
         auth('admin')->logout();
         return response()->json(['message' => 'Logged out successfully']);
     }
-        /**
-         * @OA\Post(
-         *     path="/admin/logout",
-         *     summary="Admin logout",
-         *     tags={"AdminAuth"},
-         *     @OA\Response(response=200, description="Logged out successfully")
-         * )
-         */
 }

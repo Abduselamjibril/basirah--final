@@ -11,6 +11,7 @@ use OpenApi\Attributes as OA;
 )]
 #[OA\Server(url: 'http://localhost:8000/api')]
 #[OA\Tag(name: "Auth", description: "Authentication related endpoints")] // Add this line
+#[OA\Tag(name: "AdminAuth", description: "Admin Authentication and Profile management")]
 class ApiDoc
 {
     #[OA\Get(
