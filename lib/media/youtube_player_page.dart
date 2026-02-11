@@ -2,32 +2,29 @@
 
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io' show Platform;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
+import 'package:logger/logger.dart'; // Import logger
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:pod_player/pod_player.dart';
+import 'package:youtube_player_flutter/youtube_player_flutter.dart';
+
 import '../theme_provider.dart'; // Adjust path if necessary
 
-// --- Screen Recording Prevention Imports ---
-import 'dart:io' show Platform;
-// NOTE: Screen recording prevention for iOS requires additional native setup.
-// This code provides the Flutter-side logic.
+// Screen recording prevention has been removed.
 
 const String _apiBaseUrl = "https://admin.basirahtv.com"; // Your API base URL
-// Align accent color with Audio player
-const Color _playerPrimaryColor = Color(0xFF009B77);
 
 class YouTubePlayerPage extends StatefulWidget {
   final String initialYoutubeUrl;
   final String initialEpisodeTitle;
-  final List<Map<String, dynamic>> otherEpisodes;
+  final List<Map<String, String>> otherEpisodes;
   final int initialEpisodeId;
   final int contentId;
   final String contentType;
-  // These properties were duplicates and are covered by the 'initial' ones.
-  // Kept for constructor compatibility but are not used internally.
   final String episodeTitle;
   final int episodeId;
   final String youtubeUrl;
@@ -39,7 +36,6 @@ class YouTubePlayerPage extends StatefulWidget {
     required this.initialEpisodeId,
     required this.contentId,
     required this.contentType,
-    // These are redundant but kept for API compatibility from the user's code.
     required this.episodeTitle,
     required this.episodeId,
     required this.youtubeUrl,
@@ -52,17 +48,26 @@ class YouTubePlayerPage extends StatefulWidget {
 
 class _YouTubePlayerPageState extends State<YouTubePlayerPage>
     with WidgetsBindingObserver {
-  late PodPlayerController _podController;
-  late String _currentYoutubeUrl;
+  // Initialize the logger
+  final Logger _logger = Logger(
+    printer: PrettyPrinter(
+      methodCount: 1, // Number of method calls to be displayed
+      errorMethodCount: 5, // Number of method calls if stacktrace is provided
+      lineLength: 100, // Width of the log print
+      colors: true, // Colorful log messages
+      printEmojis: true, // Print an emoji for each log message
+      printTime: false, // Should each log print contain a timestamp
+    ),
+  );
+
+  late YoutubePlayerController _ytController;
+  late String _currentVideoId;
   late String _currentEpisodeTitle;
   late int _currentEpisodeId;
-  late final List<Map<String, dynamic>> _playlistEpisodes;
+  bool _isFullScreen = false;
 
-  // --- State Variables for Player Logic ---
   bool _isPlayerReady = false;
-  PodVideoState? _playerState;
-  bool _isDisposing = false;
-  bool _isActiveInTree = true;
+  PlayerState _playerState = PlayerState.unknown;
   Timer? _progressUpdateTimer;
 
   // --- Theme colors ---
@@ -80,145 +85,56 @@ class _YouTubePlayerPageState extends State<YouTubePlayerPage>
   late Color _appBarColor;
   late Color _appBarIconColor;
 
-  // --- Screen Recording State ---
-  bool _isIOSScreenRecording = false;
-  StreamSubscription<bool>? _iosScreenRecordingSubscription;
-  bool _hasShownRecordingDialog = false;
-
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
 
-    // Normalize playlist data
-    _playlistEpisodes = widget.otherEpisodes
-        .map<Map<String, dynamic>>(_normalizeEpisode)
-        .toList(growable: false);
-
-    // Set initial episode data
     _currentEpisodeId = widget.initialEpisodeId;
     _currentEpisodeTitle = widget.initialEpisodeTitle;
-    final cleanUrl = widget.initialYoutubeUrl.split('&').first;
-    _currentYoutubeUrl = cleanUrl;
+    final initialVideoId =
+        YoutubePlayer.convertUrlToId(widget.initialYoutubeUrl);
 
-    // Initialize the PodPlayerController
-    _podController = PodPlayerController(
-      playVideoFrom: PlayVideoFrom.youtube(_currentYoutubeUrl),
-      podPlayerConfig: const PodPlayerConfig(
+    if (initialVideoId == null) {
+      _logger.e(
+          "Invalid initial YouTube URL provided: ${widget.initialYoutubeUrl}");
+      _currentVideoId = 'dQw4w9WgXcQ'; // Fallback video ID
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _handleInvalidUrl("Invalid initial YouTube URL provided.");
+      });
+    } else {
+      _currentVideoId = initialVideoId;
+    }
+
+    _logger.i(
+      'Initializing player for episode "${widget.initialEpisodeTitle}" (ID: $_currentEpisodeId) with Video ID: $_currentVideoId',
+    );
+
+    _ytController = YoutubePlayerController(
+      initialVideoId: _currentVideoId,
+      flags: const YoutubePlayerFlags(
         autoPlay: true,
-        isLooping: false,
-        videoQualityPriority: [720, 360],
+        mute: false,
+        enableCaption: false,
+        disableDragSeek: false,
+        loop: false,
+        forceHD: false,
+        isLive: false,
       ),
-    )..initialise();
-
-    // Add listener for state changes (playing, paused, ended, etc.)
-    _podController.addListener(_playerListener);
+    )..addListener(_playerListener);
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _updateThemeColors();
     });
   }
 
-  @override
-  void deactivate() {
-    _isActiveInTree = false;
-    _progressUpdateTimer?.cancel();
-    super.deactivate();
-  }
-
-  @override
-  void activate() {
-    _isActiveInTree = true;
-    super.activate();
-  }
-
-  Map<String, dynamic> _normalizeEpisode(Map<String, dynamic> episode) {
-    return {
-      'id': '${episode['id'] ?? episode['episode_id'] ?? ''}',
-      'url': '${episode['url'] ?? episode['youtube_url'] ?? ''}',
-      'youtube_url': '${episode['youtube_url'] ?? episode['url'] ?? ''}',
-      'title': '${episode['title'] ?? episode['name'] ?? ''}',
-      'name': '${episode['name'] ?? episode['title'] ?? ''}',
-      'thumbnail_url':
-          '${episode['thumbnail_url'] ?? episode['thumbnail'] ?? episode['image'] ?? ''}',
-      'thumbnail':
-          '${episode['thumbnail'] ?? episode['thumbnail_url'] ?? episode['image'] ?? ''}',
-      'image': '${episode['image'] ?? episode['thumbnail'] ?? ''}',
-    };
-  }
-
-  void _handleIOSScreenRecordingChange(bool isRecording) {
-    if (!mounted) return;
-
-    bool oldStatus = _isIOSScreenRecording;
-    setState(() => _isIOSScreenRecording = isRecording);
-
-    if (isRecording) {
-      print(
-          "[YouTubePlayerPage] iOS screen recording detected! Pausing video.");
-      if (_podController.isVideoPlaying) {
-        _podController.pause();
-      }
-      _showScreenRecordingWarningDialog();
-    } else {
-      if (oldStatus == true && isRecording == false) {
-        print("[YouTubePlayerPage] iOS screen recording stopped.");
-        if (_podController.isInitialised && !_isPlayerReady) {
-          // Trigger the listener logic again if the player is ready but wasn't marked as such
-          _playerListener();
-        }
-      }
-    }
-  }
-
-  void _showScreenRecordingWarningDialog() {
-    if (!mounted ||
-        !Platform.isIOS ||
-        !_isIOSScreenRecording ||
-        _hasShownRecordingDialog) return;
-
-    setState(() => _hasShownRecordingDialog = true);
-
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (BuildContext dialogContext) {
-        final themeProvider =
-            Provider.of<ThemeProvider>(context, listen: false);
-        final isNightMode = themeProvider.isDarkMode;
-        return AlertDialog(
-          backgroundColor: isNightMode ? const Color(0xFF1E2A3A) : Colors.white,
-          title: Text("Screen Recording Active",
-              style: TextStyle(
-                  color: isNightMode ? Colors.white : Colors.black87)),
-          content: Text(
-              "To protect our content, video playback is disabled while screen recording is active. Please stop recording to continue.",
-              style: TextStyle(
-                  color: isNightMode ? Colors.white70 : Colors.black54)),
-          actions: <Widget>[
-            TextButton(
-              child: Text("OK", style: TextStyle(color: _primaryColor)),
-              onPressed: () {
-                Navigator.of(dialogContext).pop();
-                setState(() {
-                  _hasShownRecordingDialog = false;
-                  _isIOSScreenRecording = false;
-                });
-              },
-            ),
-          ],
-        );
-      },
-    );
-  }
-
   void _updateThemeColors() {
-    if (!mounted || _isDisposing || !_isActiveInTree) return;
+    if (!mounted) return;
     final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
     final isNightMode = themeProvider.isDarkMode;
     final ThemeData currentTheme = themeProvider.currentTheme;
     setState(() {
-      _primaryColor = _playerPrimaryColor;
+      _primaryColor = currentTheme.primaryColor;
       _scaffoldBgColor = currentTheme.scaffoldBackgroundColor;
       _belowPlayerBgColor =
           isNightMode ? const Color(0xFF121212) : Colors.grey.shade50;
@@ -228,9 +144,8 @@ class _YouTubePlayerPageState extends State<YouTubePlayerPage>
           currentTheme.textTheme.titleMedium?.color?.withOpacity(0.8) ??
               (isNightMode ? Colors.white70 : Colors.black54);
       _dividerColor = currentTheme.dividerColor.withOpacity(0.5);
-      _currentPlaylistItemBgColor = isNightMode
-          ? Colors.grey[850]!
-          : _playerPrimaryColor.withOpacity(0.08);
+      _currentPlaylistItemBgColor =
+          isNightMode ? Colors.grey[850]! : _primaryColor.withOpacity(0.08);
       _currentPlaylistItemTextColor = isNightMode
           ? currentTheme.colorScheme.secondary
           : currentTheme.primaryColorDark;
@@ -240,14 +155,14 @@ class _YouTubePlayerPageState extends State<YouTubePlayerPage>
               : Colors.black.withOpacity(0.9));
       _thumbnailPlaceholderBgColor =
           isNightMode ? Colors.grey[800]! : Colors.grey[300]!;
-      _infoSnackbarBgColor =
-          isNightMode ? Colors.grey[700]! : _playerPrimaryColor;
+      _infoSnackbarBgColor = isNightMode ? Colors.grey[700]! : _primaryColor;
       _appBarColor = currentTheme.scaffoldBackgroundColor;
       _appBarIconColor = isNightMode ? Colors.white : Colors.black54;
     });
   }
 
   void _handleInvalidUrl(String message) {
+    _logger.w("Handling invalid URL: $message");
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       _showErrorSnackbar(message);
@@ -259,25 +174,13 @@ class _YouTubePlayerPageState extends State<YouTubePlayerPage>
     });
   }
 
-  // This listener is called whenever the player's state changes.
   void _playerListener() {
     if (!mounted) return;
 
-    // Handle screen recording interruption
-    if (Platform.isIOS &&
-        _isIOSScreenRecording &&
-        _podController.isVideoPlaying) {
-      _podController.pause();
-      _showScreenRecordingWarningDialog();
-      return;
-    }
-
+    final currentControllerState = _ytController.value.playerState;
     final bool wasPlayerLogicReady = _isPlayerReady;
-    final PodVideoState currentControllerState = _podController.videoState;
 
-    // Check if player is initialized and ready for interactions
-    if (_podController.isInitialised &&
-        !(Platform.isIOS && _isIOSScreenRecording)) {
+    if (_ytController.value.isReady) {
       if (!_isPlayerReady) {
         if (mounted) setState(() => _isPlayerReady = true);
       }
@@ -287,41 +190,36 @@ class _YouTubePlayerPageState extends State<YouTubePlayerPage>
       }
     }
 
-    // Actions to perform when the player first becomes ready
     if (_isPlayerReady && !wasPlayerLogicReady) {
+      _logger.i(
+          "Player is now ready. State: ${_ytController.value.playerState.name}");
       _updateEpisodeProgress(_currentEpisodeId);
-      if (currentControllerState == PodVideoState.playing) {
+      if (_ytController.value.playerState == PlayerState.playing) {
         _startPeriodicProgressUpdates();
       }
     }
 
-    // Handle player state changes (playing, paused, ended, etc.)
     if (_isPlayerReady && currentControllerState != _playerState) {
+      _logger.d(
+          "Player state changed from ${_playerState.name} to ${currentControllerState.name}");
       if (mounted) setState(() => _playerState = currentControllerState);
-      if (_playerState == PodVideoState.playing) {
+      if (_playerState == PlayerState.playing) {
         _startPeriodicProgressUpdates();
-      } else if (_playerState == PodVideoState.paused &&
-          _podController.currentVideoPosition > Duration.zero) {
-        // Detect if video ended: paused and at (or near) end
-        final pos = _podController.currentVideoPosition;
-        final total = _podController.totalVideoLength;
-        final isEnded =
-            total.inSeconds > 0 && (total.inSeconds - pos.inSeconds).abs() <= 1;
-        _progressUpdateTimer?.cancel();
-        _sendProgressUpdate(isCompleted: isEnded);
-        if (isEnded) {
-          if (!mounted || (Platform.isIOS && _isIOSScreenRecording)) return;
-          _playNextEpisode();
-        }
       } else {
         _progressUpdateTimer?.cancel();
+        if (_playerState == PlayerState.paused &&
+            _ytController.value.position > Duration.zero) {
+          _sendProgressUpdate();
+        }
+      }
+      if (_playerState == PlayerState.ended) {
+        _sendProgressUpdate(isCompleted: true);
+        _playNextEpisode();
       }
     }
 
-    // Log errors if any
-    if (_podController.videoPlayerValue?.hasError ?? false) {
-      debugPrint(
-          '[YouTubePlayerPage] Pod Player Error: ${_podController.videoPlayerValue?.errorDescription}');
+    if (_ytController.value.errorCode != 0) {
+      _logger.e('Youtube Player Error Code: ${_ytController.value.errorCode}');
     }
   }
 
@@ -334,7 +232,7 @@ class _YouTubePlayerPageState extends State<YouTubePlayerPage>
       final p = await SharedPreferences.getInstance();
       return p.getString('userPhoneNumber');
     } catch (e) {
-      print("[YouTubePlayerPage] Error getting phone number: $e");
+      _logger.e("Error getting phone number from SharedPreferences", e);
       return null;
     }
   }
@@ -342,19 +240,14 @@ class _YouTubePlayerPageState extends State<YouTubePlayerPage>
   void _startPeriodicProgressUpdates() {
     _progressUpdateTimer?.cancel();
     if (_isPlayerReady &&
-        _podController.isVideoPlaying &&
-        _isActiveInTree &&
-        !_isDisposing) {
+        _ytController.value.playerState == PlayerState.playing) {
+      _logger.d("Starting periodic progress updates every 15 seconds.");
       _progressUpdateTimer =
           Timer.periodic(const Duration(seconds: 15), (timer) {
-        if (mounted &&
-            _isActiveInTree &&
-            !_isDisposing &&
-            _podController.isVideoPlaying) {
-          if (!(Platform.isIOS && _isIOSScreenRecording)) {
-            _sendProgressUpdate();
-          }
+        if (mounted && _ytController.value.playerState == PlayerState.playing) {
+          _sendProgressUpdate();
         } else {
+          _logger.d("Stopping periodic progress updates.");
           timer.cancel();
         }
       });
@@ -362,23 +255,30 @@ class _YouTubePlayerPageState extends State<YouTubePlayerPage>
   }
 
   Future<void> _sendProgressUpdate({bool isCompleted = false}) async {
-    if (_isDisposing || !_isActiveInTree) return;
     if (!_isPlayerReady && !isCompleted) return;
-    if (Platform.isIOS && _isIOSScreenRecording && !isCompleted) return;
 
     final phoneNumber = await _getPhoneNumber();
-    if (phoneNumber == null) return;
+    if (phoneNumber == null) {
+      _logger.w("Cannot send progress update: Phone number is null.");
+      return;
+    }
 
-    final currentPositionSeconds =
-        _podController.currentVideoPosition.inSeconds;
-    final totalDurationSeconds = _podController.totalVideoLength.inSeconds;
+    final currentPositionSeconds = _ytController.value.position.inSeconds;
+    final totalDurationSeconds = _ytController.metadata.duration.inSeconds;
 
     final bool nearEnd = totalDurationSeconds > 0 &&
         (totalDurationSeconds - currentPositionSeconds) < 5;
     if (currentPositionSeconds <= 0 &&
         !isCompleted &&
         !nearEnd &&
-        totalDurationSeconds > 5) return;
+        totalDurationSeconds > 5) {
+      _logger.d("Skipping progress update at the beginning of the video.");
+      return;
+    }
+
+    _logger.i(
+      'Sending progress update for Episode ID: $_currentEpisodeId at ${currentPositionSeconds}s. Completed: $isCompleted',
+    );
 
     final body = json.encode({
       'phone_number': phoneNumber,
@@ -391,7 +291,7 @@ class _YouTubePlayerPageState extends State<YouTubePlayerPage>
         'total_duration_seconds': totalDurationSeconds,
     });
     try {
-      await http
+      final response = await http
           .post(Uri.parse('$_apiBaseUrl/api/progress/update'),
               headers: {
                 'Content-Type': 'application/json',
@@ -399,86 +299,108 @@ class _YouTubePlayerPageState extends State<YouTubePlayerPage>
               },
               body: body)
           .timeout(const Duration(seconds: 10));
+
+      if (response.statusCode == 401) {
+        _logger.w("Authentication failed. User may need to log in again.");
+        if (mounted) {
+          _showErrorSnackbar("Session expired. Please log in again.");
+        }
+      } else if (response.statusCode >= 400) {
+        _logger.w(
+            "Progress update API returned error: ${response.statusCode}, Body: ${response.body}");
+      } else {
+        _logger.d("Progress update successful.");
+      }
     } catch (e) {
+      _logger.w('Failed to send progress update.', e);
       /* Handled gracefully */
     }
   }
 
   void _playNextEpisode() {
-    if (Platform.isIOS && _isIOSScreenRecording) {
-      _showScreenRecordingWarningDialog();
-      return;
-    }
-    final currentIndex = _playlistEpisodes.indexWhere(
+    final currentIndex = widget.otherEpisodes.indexWhere(
         (ep) => int.tryParse(ep['id'] ?? '-1') == _currentEpisodeId);
-    if (currentIndex != -1 && currentIndex < _playlistEpisodes.length - 1) {
-      _playEpisode(_playlistEpisodes[currentIndex + 1]);
+    if (currentIndex != -1 && currentIndex < widget.otherEpisodes.length - 1) {
+      _logger.i("Playing next episode in the playlist.");
+      _playEpisode(widget.otherEpisodes[currentIndex + 1]);
     } else {
+      _logger.i("Reached the end of the playlist.");
       if (mounted) _showInfoSnackbar("You've reached the end of the playlist.");
     }
   }
 
-  void _playEpisode(Map<String, dynamic> episode) {
-    if (Platform.isIOS && _isIOSScreenRecording) {
-      _showScreenRecordingWarningDialog();
-      return;
-    }
-    final String url = '${episode['url'] ?? episode['youtube_url'] ?? ''}';
-    final String title = '${episode['title'] ?? episode['name'] ?? ''}';
-    final String idStr = '${episode['id'] ?? ''}';
+  void _playEpisode(Map<String, String> episode) {
+    final String? url = episode['url'] ?? episode['youtube_url'];
+    final String? title = episode['title'] ?? episode['name'];
+    final String? idStr = episode['id'];
 
-    if (url.isEmpty || title.isEmpty || idStr.isEmpty) {
-      if (mounted) {
+    if (url == null || title == null || idStr == null) {
+      _logger.w("Cannot play episode: data is incomplete. Data: $episode");
+      if (mounted)
         _showErrorSnackbar("Cannot play episode: data is incomplete.");
-      }
       return;
     }
     final int? episodeId = int.tryParse(idStr);
     if (episodeId == null) {
-      if (mounted) {
+      _logger.w("Cannot play episode: invalid episode ID format. ID: '$idStr'");
+      if (mounted)
         _showErrorSnackbar("Cannot play episode: invalid episode ID format.");
-      }
       return;
     }
-
-    // pod_player can handle full YouTube URLs, no ID conversion needed.
-    if (!url.contains('youtu')) {
-      if (mounted) {
+    final String? videoId = YoutubePlayer.convertUrlToId(url);
+    if (videoId == null) {
+      _logger.w("Cannot play '$title': Invalid YouTube URL. URL: '$url'");
+      if (mounted)
         _showErrorSnackbar("Cannot play '$title': Invalid YouTube URL.");
-      }
       return;
     }
 
+    _logger.i(
+        'Playing new episode: "$title" (ID: $episodeId), Video ID: $videoId');
     if (mounted) {
       if (_isPlayerReady) _sendProgressUpdate();
       setState(() {
-        _currentYoutubeUrl = url;
+        _currentVideoId = videoId;
         _currentEpisodeTitle = title;
         _currentEpisodeId = episodeId;
-        _isPlayerReady = false; // Player will re-initialize
-        _playerState = PodVideoState.loading;
+        _isPlayerReady = false;
+        _playerState = PlayerState.unknown;
       });
     }
-    try {
-      // Use changeVideo to load a new source into the existing player
-      _podController.changeVideo(playVideoFrom: PlayVideoFrom.youtube(url));
-    } catch (e) {
-      if (mounted) {
-        _showErrorSnackbar("Could not load video. Please try again.");
-      }
-    }
-    if (mounted && _isActiveInTree && !_isDisposing) {
-      FocusScope.of(context).unfocus();
-    }
+    _ytController.load(videoId);
+    FocusScope.of(context).unfocus();
+  }
+
+  void _enterFullScreen() {
+    if (_isFullScreen) return; // Prevent re-entry
+
+    _logger.d("Entering full screen.");
+    _isFullScreen = true;
+
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+    SystemChrome.setPreferredOrientations(
+        [DeviceOrientation.landscapeLeft, DeviceOrientation.landscapeRight]);
+
+    if (mounted) setState(() {});
+  }
+
+  void _exitFullScreen() {
+    if (!_isFullScreen) return; // Prevent re-exit
+
+    _logger.d("Exiting full screen.");
+    _isFullScreen = false;
+
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+    SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
+
+    if (mounted) setState(() {});
   }
 
   void _showErrorSnackbar(String message) {
-    if (!mounted || _isDisposing || !_isActiveInTree) return;
-    final messenger = ScaffoldMessenger.maybeOf(context);
-    if (messenger == null) return;
+    if (!mounted) return;
     final Color errorBgColor = Colors.redAccent.shade700;
-    messenger.removeCurrentSnackBar();
-    messenger.showSnackBar(SnackBar(
+    ScaffoldMessenger.of(context).removeCurrentSnackBar();
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
       content: Text(message, style: const TextStyle(color: Colors.white)),
       behavior: SnackBarBehavior.floating,
       backgroundColor: errorBgColor,
@@ -489,11 +411,9 @@ class _YouTubePlayerPageState extends State<YouTubePlayerPage>
   }
 
   void _showInfoSnackbar(String message) {
-    if (!mounted || _isDisposing || !_isActiveInTree) return;
-    final messenger = ScaffoldMessenger.maybeOf(context);
-    if (messenger == null) return;
-    messenger.removeCurrentSnackBar();
-    messenger.showSnackBar(SnackBar(
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).removeCurrentSnackBar();
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
       content: Text(message, style: const TextStyle(color: Colors.white)),
       behavior: SnackBarBehavior.floating,
       backgroundColor: _infoSnackbarBgColor,
@@ -507,125 +427,139 @@ class _YouTubePlayerPageState extends State<YouTubePlayerPage>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     super.didChangeAppLifecycleState(state);
+    _logger.d("App lifecycle state changed: ${state.name}");
     if (!mounted) return;
-    // Pause the video when the app goes into the background
     if (state == AppLifecycleState.paused &&
         _isPlayerReady &&
-        _podController.isVideoPlaying) {
-      _podController.pause();
-      if (!(Platform.isIOS && _isIOSScreenRecording)) _sendProgressUpdate();
+        _ytController.value.playerState == PlayerState.playing) {
+      _logger.i("App paused, pausing video and sending progress update.");
+      _ytController.pause();
+      _sendProgressUpdate();
     }
   }
 
   @override
+  void didChangeMetrics() {
+    super.didChangeMetrics();
+    // This helps detect when the system changes orientation
+    // and prevents the fullscreen toggle loop
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        final newIsFullScreen = _ytController.value.isFullScreen;
+        if (newIsFullScreen != _isFullScreen) {
+          setState(() {
+            _isFullScreen = newIsFullScreen;
+          });
+        }
+      }
+    });
+  }
+
+  @override
   void dispose() {
-    _isDisposing = true;
+    _logger.i('Disposing YouTubePlayerPage.');
     WidgetsBinding.instance.removeObserver(this);
-    _iosScreenRecordingSubscription?.cancel();
     _progressUpdateTimer?.cancel();
 
-    // Send final progress update before disposing
-    if (_isPlayerReady &&
-        (_podController.currentVideoPosition > Duration.zero)) {
-      if (!(Platform.isIOS && _isIOSScreenRecording)) _sendProgressUpdate();
-    }
-
-    // Ensure the app exits fullscreen mode if the page is disposed while in fullscreen
-    if (_podController.isFullScreen) {
+    // Always exit fullscreen on dispose to avoid state issues
+    if (_isFullScreen) {
       SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
       SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
     }
 
-    // Remove the listener and dispose of the controller to free up resources
-    _podController.removeListener(_playerListener);
-    _podController.dispose();
+    if (mounted &&
+        _isPlayerReady &&
+        (_ytController.value.position > Duration.zero)) {
+      _sendProgressUpdate();
+    }
+
+    _ytController.removeListener(_playerListener);
+    _ytController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     _updateThemeColors();
-    final bool hideUIForRecording = Platform.isIOS && _isIOSScreenRecording;
-    final bool enablePlaylistTapInteraction = !hideUIForRecording;
+    final playerTopBarIconColor = Colors.white;
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(
-          _currentEpisodeTitle,
-          style: TextStyle(
-            color: _appBarIconColor, // Use consistent icon color for title
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-          ),
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
+    return YoutubePlayerBuilder(
+      onExitFullScreen: _exitFullScreen,
+      onEnterFullScreen: _enterFullScreen,
+      player: YoutubePlayer(
+        controller: _ytController,
+        showVideoProgressIndicator: true,
+        progressIndicatorColor: _primaryColor,
+        progressColors: ProgressBarColors(
+          playedColor: _primaryColor,
+          handleColor: _primaryColor.withOpacity(0.9),
         ),
-        backgroundColor: _appBarColor,
-        elevation: 0,
-        iconTheme: IconThemeData(color: _appBarIconColor),
+        onReady: () {
+          if (mounted && _ytController.value.isReady && !_isPlayerReady) {
+            _playerListener();
+          }
+        },
+        topActions: <Widget>[
+          const SizedBox(width: 8.0),
+          if (!_isFullScreen && Navigator.canPop(context))
+            IconButton(
+                icon: Icon(Icons.arrow_back_ios_new,
+                    color: playerTopBarIconColor, size: 20.0),
+                onPressed: () => Navigator.pop(context)),
+          const Spacer(),
+          const SizedBox(width: 8.0),
+        ],
       ),
-      backgroundColor: _scaffoldBgColor,
-      body: SafeArea(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            AspectRatio(
-              aspectRatio: 16 / 9,
-              child: hideUIForRecording
-                  ? _buildScreenRecordingOverlay()
-                  : PodVideoPlayer(
-                      controller: _podController,
-                      podPlayerLabels: const PodPlayerLabels(
-                        quality: 'Quality',
+      builder: (context, playerWidgetFromBuilder) {
+        return Scaffold(
+          appBar: _isFullScreen
+              ? null
+              : AppBar(
+                  title: Text(
+                    _currentEpisodeTitle,
+                    style: const TextStyle(
+                      color: Color.fromARGB(255, 0, 0, 0),
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  backgroundColor: _appBarColor,
+                  elevation: 0,
+                  iconTheme: IconThemeData(color: _appBarIconColor),
+                ),
+          backgroundColor: _scaffoldBgColor,
+          body: SafeArea(
+            top: !_isFullScreen,
+            bottom: !_isFullScreen,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                AspectRatio(
+                  aspectRatio: 16 / 9,
+                  child: playerWidgetFromBuilder,
+                ),
+                if (!_isFullScreen)
+                  Expanded(
+                    child: Container(
+                      color: _belowPlayerBgColor,
+                      child: SingleChildScrollView(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _buildVideoInfo(),
+                            _buildPlaylist(),
+                          ],
+                        ),
                       ),
                     ),
-            ),
-            Expanded(
-              child: Container(
-                color: _belowPlayerBgColor,
-                child: SingleChildScrollView(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _buildVideoInfo(),
-                      _buildPlaylist(enablePlaylistTapInteraction),
-                    ],
                   ),
-                ),
-              ),
+              ],
             ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildScreenRecordingOverlay() {
-    return Container(
-      color: Colors.black,
-      alignment: Alignment.center,
-      child: Padding(
-        padding: const EdgeInsets.all(30.0),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.videocam_off_outlined,
-                color: Colors.yellow.shade700, size: 50),
-            const SizedBox(height: 20),
-            const Text("Playback Disabled",
-                style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold),
-                textAlign: TextAlign.center),
-            const SizedBox(height: 10),
-            const Text(
-                "Screen recording is active. Please stop recording to watch the video.",
-                style: TextStyle(color: Colors.white70, fontSize: 16),
-                textAlign: TextAlign.center),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 
@@ -642,8 +576,8 @@ class _YouTubePlayerPageState extends State<YouTubePlayerPage>
     );
   }
 
-  Widget _buildPlaylist(bool enableTap) {
-    final playlistItems = _playlistEpisodes;
+  Widget _buildPlaylist() {
+    final playlistItems = widget.otherEpisodes;
     if (playlistItems.isEmpty) return const SizedBox.shrink();
 
     return Column(
@@ -670,20 +604,21 @@ class _YouTubePlayerPageState extends State<YouTubePlayerPage>
           physics: const NeverScrollableScrollPhysics(),
           itemCount: playlistItems.length,
           itemBuilder: (context, index) =>
-              _buildPlaylistItem(playlistItems[index], index, enableTap),
+              _buildPlaylistItem(playlistItems[index], index),
         ),
       ],
     );
   }
 
-  Widget _buildPlaylistItem(
-      Map<String, dynamic> episode, int index, bool enableTap) {
-    final int? episodeId = int.tryParse('${episode['id'] ?? ''}');
+  Widget _buildPlaylistItem(Map<String, String> episode, int index) {
+    final int? episodeId = int.tryParse(episode['id'] ?? '');
     final bool isCurrent = episodeId != null && episodeId == _currentEpisodeId;
-    final String thumbnailUrl =
-        '${episode['thumbnail_url'] ?? episode['thumbnail'] ?? episode['image'] ?? ''}';
+    final String thumbnailUrl = episode['thumbnail_url'] ??
+        episode['thumbnail'] ??
+        episode['image'] ??
+        '';
     final String title =
-        '${episode['title'] ?? episode['name'] ?? 'Untitled Episode'}';
+        episode['title'] ?? episode['name'] ?? 'Untitled Episode';
     final bool isThumbnailValid = thumbnailUrl.isNotEmpty &&
         (thumbnailUrl.startsWith('http://') ||
             thumbnailUrl.startsWith('https://'));
@@ -698,7 +633,7 @@ class _YouTubePlayerPageState extends State<YouTubePlayerPage>
     return Material(
       color: itemBgColor,
       child: InkWell(
-        onTap: isCurrent || !enableTap ? null : () => _playEpisode(episode),
+        onTap: isCurrent ? null : () => _playEpisode(episode),
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 16.0),
           decoration: BoxDecoration(
@@ -728,8 +663,7 @@ class _YouTubePlayerPageState extends State<YouTubePlayerPage>
                   ),
                   if (isCurrent &&
                       _isPlayerReady &&
-                      _playerState == PodVideoState.playing &&
-                      !(Platform.isIOS && _isIOSScreenRecording))
+                      _playerState == PlayerState.playing)
                     Positioned.fill(
                       child: Container(
                         decoration: BoxDecoration(

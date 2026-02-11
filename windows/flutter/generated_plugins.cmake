@@ -5,6 +5,7 @@
 list(APPEND FLUTTER_PLUGIN_LIST
   connectivity_plus
   firebase_core
+  flutter_inappwebview_windows
   permission_handler_windows
   screen_brightness_windows
   url_launcher_windows

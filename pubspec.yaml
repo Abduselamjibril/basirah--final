@@ -13,20 +13,18 @@ dependencies:
   better_player_plus: ^1.1.2
   http: ^1.2.1
   cupertino_icons: ^1.0.8
-  shared_preferences: ^2.0.0
+  shared_preferences: ^2.2.2
   rxdart: ^0.27.7
   video_player: ^2.4.5
   
-  # --- THE KEY FIX IS HERE ---
-  # Using the latest STABLE version of youtube_player_flutter.
-  # This version is compatible with modern Firebase and flutter_inappwebview.
-  youtube_player_flutter: ^9.0.0
+  # Use latest stable version for compatibility
+  youtube_player_flutter: ^9.1.3
 
   # Rich feature video player with YouTube/Vimeo support, quality picker, PiP, gestures.
   pod_player: ^0.2.2
   
   # This version is compatible with the stable youtube_player and Firebase.
-  flutter_inappwebview: ^6.0.0  
+  flutter_inappwebview: ^6.1.5  
   
   just_audio: ^0.9.24
   audio_service: ^0.18.12
@@ -35,7 +33,7 @@ dependencies:
   connectivity_plus: ^5.0.1
   # LATEST STABLE FIREBASE VERSIONS (KEEP THESE)
   firebase_core: ^2.30.0
-  firebase_messaging: ^14.9.2
+  firebase_messaging: ^14.7.10
   
   flutter_local_notifications: ^17.0.0
   permission_handler: ^11.3.0
@@ -52,8 +50,7 @@ dependencies:
   wakelock_plus: ^1.2.5
   screen_brightness: ^2.1.7
 
-dependency_overrides:
-  package_info_plus: 8.0.0 # Avoid Kotlin 2.2 metadata in 9.x which breaks KGP 1.9.x
+package_info_plus: ^4.0.0
   
   
   # url_launcher_web is brought in by url_launcher, so it's not always needed here.
