@@ -84,7 +84,8 @@ class _HomePageState extends State<HomePage> {
 
   void _prefetchHeroImages(List<dynamic> items, {int limit = 24}) {
     final urls = items
-        .map((e) => e is Map ? (e['image_path'] ?? e['image'])?.toString() : null)
+        .map((e) =>
+            e is Map ? (e['image_path'] ?? e['image'])?.toString() : null)
         .where((u) => u != null && u.isNotEmpty)
         .take(limit)
         .toList();
@@ -170,192 +171,159 @@ class _HomePageState extends State<HomePage> {
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
       body: RefreshIndicator(
-        // The onRefresh now calls our simplified method
         onRefresh: () => _fetchAllData(forceRefresh: true),
         color: const Color(0xFF009B77),
         backgroundColor: theme.cardColor,
-        child: CustomScrollView(
-          slivers: [
-            SliverAppBar(
-              backgroundColor: isNightMode
-                  ? const Color(0xFF1E1E1E)
-                  : const Color(0xFF009B77),
-              expandedHeight: 250.0,
-              floating: false,
-              pinned: true,
-              flexibleSpace: FlexibleSpaceBar(
-                titlePadding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                centerTitle: true,
-                title: searchQuery.isNotEmpty
-                    ? Text(
-                        'Searching: "$searchQuery"',
-                        style: const TextStyle(fontSize: 16.0, shadows: [
-                          Shadow(color: Colors.black54, blurRadius: 2)
-                        ]),
-                      )
-                    : null,
-                background: Container(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: isNightMode
-                          ? [
-                              const Color(0xFF1E1E1E),
-                              const Color(0xFF009B77).withOpacity(0.8),
-                            ]
-                          : [
-                              const Color(0xFF009B77),
-                              const Color(0xFF00796B),
-                            ],
-                    ),
-                  ),
-                  child: SingleChildScrollView(
-                    physics: const ClampingScrollPhysics(),
-                    child: Padding(
-                      padding: EdgeInsets.only(
-                        top: MediaQuery.of(context).padding.top + 20,
-                        bottom: 60,
-                        left: 24,
-                        right: 24,
-                      ),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                            const Text('Basirah TV',
-                              style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 32.0,
-                                  fontWeight: FontWeight.bold,
-                                  shadows: [
-                                    Shadow(
-                                      color: Colors.black26,
-                                      blurRadius: 4,
-                                      offset: Offset(0, 2),
-                                    )
-                                  ])),
-                          const SizedBox(height: 8.0),
-                          Text(
-                              'Explore Quranic teachings, stories, and courses.',
-                              style: TextStyle(
-                                  color: Colors.white.withOpacity(0.9),
-                                  fontSize: 16.0)),
-                          const SizedBox(height: 20.0),
-                          Container(
-                            decoration: BoxDecoration(
-                              color: isNightMode
-                                  ? Colors.black.withOpacity(0.3)
-                                  : Colors.white.withOpacity(0.9),
-                              borderRadius: BorderRadius.circular(12.0),
-                              boxShadow: const [
-                                BoxShadow(
-                                  color: Colors.black12,
-                                  blurRadius: 8,
-                                  offset: Offset(0, 2),
-                                )
-                              ],
-                            ),
-                            child: TextField(
-                              controller: _searchController,
-                              style: TextStyle(
-                                  color: isNightMode
-                                      ? Colors.white
-                                      : Colors.black87),
-                              onChanged: (value) =>
-                                  setState(() => searchQuery = value),
-                              decoration: InputDecoration(
-                                hintText: 'Search Surah, Story, Course...',
-                                hintStyle: TextStyle(
-                                    color: isNightMode
-                                        ? Colors.white54
-                                        : Colors.grey[600]),
-                                border: InputBorder.none,
-                                prefixIcon: Icon(Icons.search,
-                                    color: isNightMode
-                                        ? Colors.white54
-                                        : Colors.grey[600]),
-                                suffixIcon: searchQuery.isNotEmpty
-                                    ? IconButton(
-                                        icon: Icon(Icons.clear,
-                                            color: isNightMode
-                                                ? Colors.white54
-                                                : Colors.grey[600]),
-                                        onPressed: () {
-                                          _searchController.clear();
-                                          setState(() => searchQuery = '');
-                                        },
-                                      )
-                                    : null,
-                                contentPadding: const EdgeInsets.symmetric(
-                                    horizontal: 16.0, vertical: 14.0),
-                              ),
-                            ),
-                          ),
+        child: ListView(
+          padding: EdgeInsets.zero,
+          children: [
+            Container(
+              width: double.infinity,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: isNightMode
+                      ? [
+                          const Color(0xFF1E1E1E),
+                          const Color(0xFF009B77).withOpacity(0.8),
+                        ]
+                      : [
+                          const Color(0xFF009B77),
+                          const Color(0xFF00796B),
+                        ],
+                ),
+              ),
+              child: Padding(
+                padding: EdgeInsets.only(
+                  top: MediaQuery.of(context).padding.top + 20,
+                  bottom: 60,
+                  left: 24,
+                  right: 24,
+                ),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Basirah TV',
+                        style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 32.0,
+                            fontWeight: FontWeight.bold,
+                            shadows: [
+                              Shadow(
+                                color: Colors.black26,
+                                blurRadius: 4,
+                                offset: Offset(0, 2),
+                              )
+                            ])),
+                    const SizedBox(height: 8.0),
+                    Text('Explore Quranic teachings, stories, and courses.',
+                        style: TextStyle(
+                            color: Colors.white.withOpacity(0.9),
+                            fontSize: 16.0)),
+                    const SizedBox(height: 20.0),
+                    Container(
+                      decoration: BoxDecoration(
+                        color: isNightMode
+                            ? Colors.black.withOpacity(0.3)
+                            : Colors.white.withOpacity(0.9),
+                        borderRadius: BorderRadius.circular(12.0),
+                        boxShadow: const [
+                          BoxShadow(
+                            color: Colors.black12,
+                            blurRadius: 8,
+                            offset: Offset(0, 2),
+                          )
                         ],
                       ),
+                      child: TextField(
+                        controller: _searchController,
+                        style: TextStyle(
+                            color: isNightMode ? Colors.white : Colors.black87),
+                        onChanged: (value) =>
+                            setState(() => searchQuery = value),
+                        decoration: InputDecoration(
+                          hintText: 'Search Surah, Story, Course...',
+                          hintStyle: TextStyle(
+                              color: isNightMode
+                                  ? Colors.white54
+                                  : Colors.grey[600]),
+                          border: InputBorder.none,
+                          prefixIcon: Icon(Icons.search,
+                              color: isNightMode
+                                  ? Colors.white54
+                                  : Colors.grey[600]),
+                          suffixIcon: searchQuery.isNotEmpty
+                              ? IconButton(
+                                  icon: Icon(Icons.clear,
+                                      color: isNightMode
+                                          ? Colors.white54
+                                          : Colors.grey[600]),
+                                  onPressed: () {
+                                    _searchController.clear();
+                                    setState(() => searchQuery = '');
+                                  },
+                                )
+                              : null,
+                          contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16.0, vertical: 14.0),
+                        ),
+                      ),
                     ),
-                  ),
+                  ],
                 ),
               ),
             ),
-            SliverList(
-              delegate: SliverChildListDelegate([
-                const SizedBox(height: 8.0),
-                // --- Pass data from the provider to the sections ---
-                _buildSection(context,
-                    title: 'Quranic Courses',
-                    description:
-                        'Enroll in comprehensive courses to deepen knowledge.',
-                    content: filteredCourses,
-                    // Get loading state from provider
-                    isLoading: contentCache.isLoading('courses'),
-                    isNightMode: isNightMode,
-                    contentType: 'course',
-                    isUserPremium: isUserPremium),
-                const SizedBox(height: 24.0),
-                _buildSection(context,
-                    title: 'Objectives of Surah',
-                    description:
-                        'Explore the objectives and lessons from each Surah.',
-                    content: filteredSurahs,
-                    isLoading: contentCache.isLoading('surahs'),
-                    isNightMode: isNightMode,
-                    contentType: 'surah',
-                    isUserPremium: isUserPremium),
-                const SizedBox(height: 24.0),
-                _buildSection(context,
-                    title: 'Beyond Stories',
-                    description:
-                        'Discover inspiring stories from Islamic history.',
-                    content: filteredStories,
-                    isLoading: contentCache.isLoading('stories'),
-                    isNightMode: isNightMode,
-                    contentType: 'story',
-                    isUserPremium: isUserPremium),
-                const SizedBox(height: 24.0),
-                _buildSection(context,
-                    title: 'Commentary',
-                    description: 'Gain insights through expert commentary.',
-                    content: filteredCommentaries,
-                    isLoading: contentCache.isLoading('commentaries'),
-                    isNightMode: isNightMode,
-                    contentType: 'commentary',
-                    isUserPremium: isUserPremium),
-                const SizedBox(height: 24.0),
-                _buildSection(context,
-                    title: 'Deeper Look',
-                    description:
-                        'Explore topics with in-depth analysis and perspectives.',
-                    content: filteredDeeperLooks,
-                    isLoading: contentCache.isLoading('deeperLooks'),
-                    isNightMode: isNightMode,
-                    contentType: 'deeperLook',
-                    isUserPremium: isUserPremium),
-                const SizedBox(height: 40.0),
-              ]),
-            ),
+            const SizedBox(height: 8.0),
+            _buildSection(context,
+                title: 'Quranic Courses',
+                description:
+                    'Enroll in comprehensive courses to deepen knowledge.',
+                content: filteredCourses,
+                isLoading: contentCache.isLoading('courses'),
+                isNightMode: isNightMode,
+                contentType: 'course',
+                isUserPremium: isUserPremium),
+            const SizedBox(height: 24.0),
+            _buildSection(context,
+                title: 'Objectives of Surah',
+                description:
+                    'Explore the objectives and lessons from each Surah.',
+                content: filteredSurahs,
+                isLoading: contentCache.isLoading('surahs'),
+                isNightMode: isNightMode,
+                contentType: 'surah',
+                isUserPremium: isUserPremium),
+            const SizedBox(height: 24.0),
+            _buildSection(context,
+                title: 'Beyond Stories',
+                description: 'Discover inspiring stories from Islamic history.',
+                content: filteredStories,
+                isLoading: contentCache.isLoading('stories'),
+                isNightMode: isNightMode,
+                contentType: 'story',
+                isUserPremium: isUserPremium),
+            const SizedBox(height: 24.0),
+            _buildSection(context,
+                title: 'Commentary',
+                description: 'Gain insights through expert commentary.',
+                content: filteredCommentaries,
+                isLoading: contentCache.isLoading('commentaries'),
+                isNightMode: isNightMode,
+                contentType: 'commentary',
+                isUserPremium: isUserPremium),
+            const SizedBox(height: 24.0),
+            _buildSection(context,
+                title: 'Deeper Look',
+                description:
+                    'Explore topics with in-depth analysis and perspectives.',
+                content: filteredDeeperLooks,
+                isLoading: contentCache.isLoading('deeperLooks'),
+                isNightMode: isNightMode,
+                contentType: 'deeperLook',
+                isUserPremium: isUserPremium),
+            const SizedBox(height: 40.0),
           ],
         ),
       ),
@@ -464,7 +432,7 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-    Widget _buildContentCard(
+  Widget _buildContentCard(
       {required Map<String, dynamic> item,
       required bool isNightMode,
       required bool isUserPremium}) {
@@ -494,29 +462,29 @@ class _HomePageState extends State<HomePage> {
               children: [
                 ClipRRect(
                   borderRadius:
-                    const BorderRadius.vertical(top: Radius.circular(16.0)),
+                      const BorderRadius.vertical(top: Radius.circular(16.0)),
                   child: CachedNetworkImage(
-                  imageUrl: imageUrl ?? '',
-                  height: 140,
-                  width: double.infinity,
-                  fit: BoxFit.cover,
-                  placeholder: (context, url) => Container(
+                    imageUrl: imageUrl ?? '',
                     height: 140,
-                    color: isNightMode ? Colors.grey[800] : Colors.grey[200],
-                    child: const Center(
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2, color: Color(0xFF009B77))),
-                  ),
-                  errorWidget: (context, url, error) => Container(
-                    color: isNightMode ? Colors.grey[800] : Colors.grey[200],
-                    height: 140,
-                    child: Center(
-                      child: Icon(Icons.broken_image_outlined,
-                        color: isNightMode
-                          ? Colors.grey[500]
-                          : Colors.grey[600],
-                        size: 40)),
-                  ),
+                    width: double.infinity,
+                    fit: BoxFit.cover,
+                    placeholder: (context, url) => Container(
+                      height: 140,
+                      color: isNightMode ? Colors.grey[800] : Colors.grey[200],
+                      child: const Center(
+                          child: CircularProgressIndicator(
+                              strokeWidth: 2, color: Color(0xFF009B77))),
+                    ),
+                    errorWidget: (context, url, error) => Container(
+                      color: isNightMode ? Colors.grey[800] : Colors.grey[200],
+                      height: 140,
+                      child: Center(
+                          child: Icon(Icons.broken_image_outlined,
+                              color: isNightMode
+                                  ? Colors.grey[500]
+                                  : Colors.grey[600],
+                              size: 40)),
+                    ),
                   ),
                 ),
                 Expanded(
