@@ -254,6 +254,7 @@ class _YouTubePlayerPageState extends State<YouTubePlayerPage>
     }
   }
 
+  // UPDATED METHOD STARTS HERE
   Future<void> _sendProgressUpdate({bool isCompleted = false}) async {
     if (!_isPlayerReady && !isCompleted) return;
 
@@ -262,6 +263,15 @@ class _YouTubePlayerPageState extends State<YouTubePlayerPage>
       _logger.w("Cannot send progress update: Phone number is null.");
       return;
     }
+
+    // --- Add this: get token from SharedPreferences ---
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('token');
+    if (token == null || token.isEmpty) {
+      _logger.w("Cannot send progress update: Auth token is null.");
+      return;
+    }
+    // --------------------------------------------------
 
     final currentPositionSeconds = _ytController.value.position.inSeconds;
     final totalDurationSeconds = _ytController.metadata.duration.inSeconds;
@@ -295,7 +305,8 @@ class _YouTubePlayerPageState extends State<YouTubePlayerPage>
           .post(Uri.parse('$_apiBaseUrl/api/progress/update'),
               headers: {
                 'Content-Type': 'application/json',
-                'Accept': 'application/json'
+                'Accept': 'application/json',
+                'Authorization': 'Bearer $token', // <-- Add this line
               },
               body: body)
           .timeout(const Duration(seconds: 10));
@@ -316,6 +327,7 @@ class _YouTubePlayerPageState extends State<YouTubePlayerPage>
       /* Handled gracefully */
     }
   }
+  // UPDATED METHOD ENDS HERE
 
   void _playNextEpisode() {
     final currentIndex = widget.otherEpisodes.indexWhere(
