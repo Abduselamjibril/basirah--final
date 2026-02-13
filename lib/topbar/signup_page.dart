@@ -193,7 +193,7 @@ class _SignUpPageState extends State<SignUpPage> {
             textAlign: TextAlign.center),
         backgroundColor: color,
         behavior: SnackBarBehavior.floating,
-        margin: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 100.0),
+        margin: const EdgeInsets.fromLTRB(24.0, 0.0, 24.0, 70.0),
         shape:
             RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.0)),
         duration: const Duration(seconds: 3),
@@ -230,7 +230,11 @@ class _SignUpPageState extends State<SignUpPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            Image.asset('assets/images/logo.png', width: 120, height: 120),
+            Image.asset(
+              isDark ? 'assets/images/logo3.png' : 'assets/images/logo.png',
+              width: isDark ? 160 : 140,
+              height: isDark ? 160 : 140,
+            ),
             const SizedBox(height: 3),
             Align(
                 alignment: Alignment.centerLeft,

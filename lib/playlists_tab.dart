@@ -227,8 +227,8 @@ class _PlaylistsTabState extends State<PlaylistsTab>
     final isNightMode = themeProvider.isDarkMode;
     final primaryColor = const Color(0xFF009B77);
 
-    // Main scaffold structure remains the same
     return Scaffold(
+      resizeToAvoidBottomInset: false,
       backgroundColor: isNightMode ? Color(0xFF002147) : Colors.grey[100],
       appBar: AppBar(
         title: Text('My Playlists',
@@ -238,46 +238,46 @@ class _PlaylistsTabState extends State<PlaylistsTab>
         elevation: 1,
         iconTheme: IconThemeData(color: Colors.white),
       ),
-      body: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: TextField(
-              controller: _searchController,
-              decoration: InputDecoration(
-                hintText: 'Search playlists...',
-                prefixIcon: Icon(Icons.search_rounded),
-                border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide.none),
-                filled: true,
-                fillColor: isNightMode ? Color(0xFF1E1E1E) : Colors.white,
+      body: SafeArea(
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: TextField(
+                controller: _searchController,
+                decoration: InputDecoration(
+                  hintText: 'Search playlists...',
+                  prefixIcon: Icon(Icons.search_rounded),
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide.none),
+                  filled: true,
+                  fillColor: isNightMode ? Color(0xFF1E1E1E) : Colors.white,
+                ),
               ),
             ),
-          ),
-          Expanded(
-            child: _isLoading
-                ? Center(child: CircularProgressIndicator())
-                : !authProvider.isLoggedIn
-                    ? _buildLoginPrompt()
-                    : RefreshIndicator(
-                        onRefresh: () => _fetchPlaylists(authProvider.token!),
-                        child: _filteredPlaylists.isEmpty
-                            ? _buildEmptyState()
-                            : ListView.separated(
-                                padding:
-                                    const EdgeInsets.fromLTRB(16, 0, 16, 80),
-                                itemCount: _filteredPlaylists.length,
-                                separatorBuilder: (_, __) =>
-                                    const SizedBox(height: 10),
-                                itemBuilder: (context, index) {
-                                  final playlist = _filteredPlaylists[index];
-                                  return _buildPlaylistCard(playlist);
-                                },
-                              ),
-                      ),
-          ),
-        ],
+            Expanded(
+              child: _isLoading
+                  ? Center(child: CircularProgressIndicator())
+                  : !authProvider.isLoggedIn
+                      ? _buildLoginPrompt()
+                      : RefreshIndicator(
+                          onRefresh: () => _fetchPlaylists(authProvider.token!),
+                          child: _filteredPlaylists.isEmpty
+                              ? _buildEmptyState()
+                              : ListView.separated(
+                                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 80),
+                                  itemCount: _filteredPlaylists.length,
+                                  separatorBuilder: (_, __) => const SizedBox(height: 10),
+                                  itemBuilder: (context, index) {
+                                    final playlist = _filteredPlaylists[index];
+                                    return _buildPlaylistCard(playlist);
+                                  },
+                                ),
+                        ),
+            ),
+          ],
+        ),
       ),
       floatingActionButton: authProvider.isLoggedIn
           ? FloatingActionButton(
@@ -336,35 +336,33 @@ class _PlaylistsTabState extends State<PlaylistsTab>
     return LayoutBuilder(builder: (context, constraints) {
       return SingleChildScrollView(
         physics: AlwaysScrollableScrollPhysics(),
-        child: Container(
-          height: constraints.maxHeight,
-          child: Center(
-            child: Padding(
-              padding: const EdgeInsets.all(32.0),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                      _searchController.text.isEmpty
-                          ? Icons.playlist_play_rounded
-                          : Icons.search_off_rounded,
-                      size: 70,
-                      color: Colors.grey),
-                  SizedBox(height: 20),
-                  Text(
-                      _searchController.text.isEmpty
-                          ? 'No Playlists Yet'
-                          : 'No Playlists Found',
-                      style:
-                          TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                  SizedBox(height: 10),
-                  Text(
-                      _searchController.text.isEmpty
-                          ? 'Tap the + button to create your first playlist.'
-                          : 'Try a different search term.',
-                      textAlign: TextAlign.center),
-                ],
-              ),
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(32.0),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                    _searchController.text.isEmpty
+                        ? Icons.playlist_play_rounded
+                        : Icons.search_off_rounded,
+                    size: 70,
+                    color: Colors.grey),
+                SizedBox(height: 20),
+                Text(
+                    _searchController.text.isEmpty
+                        ? 'No Playlists Yet'
+                        : 'No Playlists Found',
+                    style:
+                        TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                SizedBox(height: 10),
+                Text(
+                    _searchController.text.isEmpty
+                        ? 'Tap the + button to create your first playlist.'
+                        : 'Try a different search term.',
+                    textAlign: TextAlign.center),
+              ],
             ),
           ),
         ),

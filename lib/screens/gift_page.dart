@@ -55,6 +55,10 @@ class _GiftPageState extends State<GiftPage> {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
       content: Text(message),
       backgroundColor: Colors.green,
+      behavior: SnackBarBehavior.floating,
+      margin: const EdgeInsets.only(left: 24.0, right: 24.0, bottom: 80.0),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      duration: const Duration(seconds: 3),
     ));
   }
 

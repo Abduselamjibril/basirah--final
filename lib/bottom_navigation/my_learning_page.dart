@@ -637,7 +637,13 @@ class _MyLearningPageState extends State<MyLearningPage> {
           } else {
             _logger.e('Invalid contentId ($contentId)');
             ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('Cannot open invalid content.')));
+                SnackBar(
+                  content: Text('Cannot open invalid content.'),
+                  behavior: SnackBarBehavior.floating,
+                  margin: const EdgeInsets.only(left: 24.0, right: 24.0, bottom: 80.0),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  duration: const Duration(seconds: 3),
+                ));
           }
         },
         child: Padding(
@@ -778,16 +784,24 @@ class _MyLearningPageState extends State<MyLearningPage> {
           _logger.w('Unknown type: $contentType');
           if (currentContext.mounted)
             ScaffoldMessenger.of(currentContext).showSnackBar(SnackBar(
-                content: Text('Cannot open details.'),
-                behavior: SnackBarBehavior.floating));
+              content: Text('Cannot open details.'),
+              behavior: SnackBarBehavior.floating,
+              margin: const EdgeInsets.only(left: 24.0, right: 24.0, bottom: 80.0),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              duration: const Duration(seconds: 3),
+            ));
           return;
       }
     } catch (e, stackTrace) {
       _logger.e('Error creating detail page', e, stackTrace);
       if (currentContext.mounted)
         ScaffoldMessenger.of(currentContext).showSnackBar(SnackBar(
-            content: Text('Error preparing details.'),
-            behavior: SnackBarBehavior.floating));
+          content: Text('Error preparing details.'),
+          behavior: SnackBarBehavior.floating,
+          margin: const EdgeInsets.only(left: 24.0, right: 24.0, bottom: 80.0),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          duration: const Duration(seconds: 3),
+        ));
       return;
     }
     if (currentContext.mounted) {

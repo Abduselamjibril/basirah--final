@@ -53,7 +53,12 @@ class _HomePageState extends State<HomePage> {
 
     if (token == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Please log in to refresh content.')));
+        const SnackBar(
+          content: Text('Please log in to refresh content.'),
+          behavior: SnackBarBehavior.floating,
+          margin: EdgeInsets.fromLTRB(24.0, 0.0, 24.0, 70.0),
+        ),
+      );
       return;
     }
 
@@ -63,7 +68,12 @@ class _HomePageState extends State<HomePage> {
 
     if (mounted && forceRefresh) {
       ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Content refreshed successfully!')));
+        const SnackBar(
+          content: Text('Content refreshed successfully!'),
+          behavior: SnackBarBehavior.floating,
+          margin: EdgeInsets.fromLTRB(24.0, 0.0, 24.0, 70.0),
+        ),
+      );
     }
   }
 

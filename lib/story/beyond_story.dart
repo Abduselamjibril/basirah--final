@@ -196,28 +196,28 @@ class _StoryNightPageState extends State<StoryNightPage> {
   void _showSuccessSnackbar(String message) {
     if (!mounted) return;
     final isNightMode =
-        Provider.of<ThemeProvider>(context, listen: false).isDarkMode;
+      Provider.of<ThemeProvider>(context, listen: false).isDarkMode;
     ScaffoldMessenger.of(context).removeCurrentSnackBar();
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(message),
-        backgroundColor:
-            isNightMode ? Colors.grey[700] : const Color(0xFF009B77),
-        behavior: SnackBarBehavior.floating,
-        margin: const EdgeInsets.all(16),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        duration: const Duration(seconds: 2)));
+      content: Text(message),
+      backgroundColor:
+        isNightMode ? Colors.grey[700] : const Color(0xFF009B77),
+      behavior: SnackBarBehavior.floating,
+      margin: const EdgeInsets.only(left: 24.0, right: 24.0, bottom: 80.0),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      duration: const Duration(seconds: 2)));
   }
 
   void _showErrorSnackbar(String message) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).removeCurrentSnackBar();
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(message),
-        backgroundColor: Colors.redAccent.shade700,
-        behavior: SnackBarBehavior.floating,
-        margin: const EdgeInsets.all(16),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        duration: const Duration(seconds: 3)));
+      content: Text(message),
+      backgroundColor: Colors.redAccent.shade700,
+      behavior: SnackBarBehavior.floating,
+      margin: const EdgeInsets.only(left: 24.0, right: 24.0, bottom: 80.0),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      duration: const Duration(seconds: 3)));
   }
 
   void _prefetchImages(List<dynamic> items, {int limit = 12}) {

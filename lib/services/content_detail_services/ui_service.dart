@@ -16,7 +16,7 @@ class UIService {
       // The theme-based color now works correctly
       backgroundColor: isNightMode ? Colors.grey[700] : const Color(0xFF009B77),
       behavior: SnackBarBehavior.floating,
-      margin: const EdgeInsets.all(16),
+      margin: const EdgeInsets.only(left: 24.0, right: 24.0, bottom: 80.0),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       duration: const Duration(seconds: 2),
     ));
@@ -28,7 +28,7 @@ class UIService {
       content: Text(message),
       backgroundColor: Colors.redAccent.shade700,
       behavior: SnackBarBehavior.floating,
-      margin: const EdgeInsets.all(16),
+      margin: const EdgeInsets.only(left: 24.0, right: 24.0, bottom: 80.0),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       duration: const Duration(seconds: 3),
     ));

@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:flutter/foundation.dart';
+import 'dart:async';
 import 'dart:convert';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
@@ -19,16 +22,103 @@ import 'topbar/account_page.dart';
 import 'topbar/login_page.dart';
 import 'topbar/signup_page.dart';
 import 'topbar/profile_page.dart';
-import 'topbar/edit_profile_page.dart'; // <-- ADDED IMPORT
+import 'topbar/edit_profile_page.dart';
 import 'topbar/faq_page.dart';
 import 'splash_screen.dart';
 import 'theme_provider.dart';
 import 'services/notification_service.dart';
 import 'services/auth_http_service.dart';
 
-// import 'package:basirahtv/screens/gift_page.dart';
 import 'screens/gift_page.dart';
 import 'firebase_options.dart';
+
+// Overlay widget to show no internet connection
+class NoInternetOverlay extends StatelessWidget {
+  const NoInternetOverlay({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Positioned.fill(
+      child: AbsorbPointer(
+        absorbing: true,
+        child: Container(
+          color: Colors.black.withOpacity(0.7),
+          alignment: Alignment.center,
+          child: Center(
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 500),
+              curve: Curves.easeInOut,
+              padding: const EdgeInsets.all(0),
+              child: Card(
+                elevation: 16,
+                color: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(24),
+                ),
+                child: Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 32, vertical: 32),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        decoration: BoxDecoration(
+                          color: Colors.redAccent.withOpacity(0.15),
+                          shape: BoxShape.circle,
+                        ),
+                        padding: const EdgeInsets.all(18),
+                        child: const Icon(Icons.wifi_off,
+                            color: Colors.redAccent, size: 56),
+                      ),
+                      const SizedBox(height: 24),
+                      const Text(
+                        'No Internet Connection',
+                        style: TextStyle(
+                          color: Colors.black87,
+                          fontSize: 24,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 0.5,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 12),
+                      const Text(
+                        'You are offline. Please check your network settings and try again.',
+                        style: TextStyle(
+                          color: Colors.black54,
+                          fontSize: 16,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 24),
+                      SizedBox(
+                        width: 160,
+                        child: ElevatedButton.icon(
+                          onPressed: null,
+                          icon: const Icon(Icons.refresh, color: Colors.white),
+                          label: const Text('Reconnect',
+                              style: TextStyle(color: Colors.white)),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.redAccent,
+                            disabledBackgroundColor: Colors.redAccent,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
 
 final GlobalKey<ScaffoldMessengerState> rootScaffoldMessengerKey =
     GlobalKey<ScaffoldMessengerState>();
@@ -59,26 +149,41 @@ final AuthHttpService authHttpService = AuthHttpService();
 final ThemeProvider themeProvider = ThemeProvider();
 
 Future<void> main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
-  FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
-  await notificationService.initNotifications(navigatorKey);
+  await runZonedGuarded(
+    () async {
+      WidgetsFlutterBinding.ensureInitialized();
+      await Firebase.initializeApp(
+        options: DefaultFirebaseOptions.currentPlatform,
+      );
+      FirebaseMessaging.onBackgroundMessage(
+          _firebaseMessagingBackgroundHandler);
+      await notificationService.initNotifications(navigatorKey);
 
-  runApp(
-    MultiProvider(
-      providers: [
-        ChangeNotifierProvider.value(value: themeProvider),
-        ChangeNotifierProvider(create: (context) => AuthProvider()),
-        ChangeNotifierProvider(create: (context) => ContentCacheProvider()),
-        ChangeNotifierProvider.value(value: notificationService),
-      ],
-      child: const BayyinahCloneApp(),
-    ),
-  );
+      runApp(
+        MultiProvider(
+          providers: [
+            ChangeNotifierProvider.value(value: themeProvider),
+            ChangeNotifierProvider(create: (context) => AuthProvider()),
+            ChangeNotifierProvider(create: (context) => ContentCacheProvider()),
+            ChangeNotifierProvider.value(value: notificationService),
+          ],
+          child: const BayyinahCloneApp(),
+        ),
+      );
 
-  _setupFirebaseListeners();
+      _setupFirebaseListeners();
+    },
+    (error, stack) {
+      // Handle uncaught errors
+    },
+    zoneSpecification: kReleaseMode
+        ? ZoneSpecification(
+            print: (self, parent, zone, message) {
+              // Do nothing in release mode
+            },
+          )
+        : null,
+  );
 }
 
 void _setupFirebaseListeners() {
@@ -131,8 +236,46 @@ void updateAndSendFcmToken() async {
   }
 }
 
-class BayyinahCloneApp extends StatelessWidget {
+class BayyinahCloneApp extends StatefulWidget {
   const BayyinahCloneApp({super.key});
+
+  @override
+  State<BayyinahCloneApp> createState() => _BayyinahCloneAppState();
+}
+
+class _BayyinahCloneAppState extends State<BayyinahCloneApp> {
+  bool _isOffline = false;
+  late final Connectivity _connectivity;
+  StreamSubscription<ConnectivityResult>? _connectivitySubscription;
+
+  @override
+  void initState() {
+    super.initState();
+    _connectivity = Connectivity();
+    _connectivitySubscription =
+        _connectivity.onConnectivityChanged.listen((result) {
+      final offline = result == ConnectivityResult.none;
+      if (offline != _isOffline && mounted) {
+        setState(() {
+          _isOffline = offline;
+        });
+      }
+    });
+    _connectivity.checkConnectivity().then((result) {
+      final offline = result == ConnectivityResult.none;
+      if (offline != _isOffline && mounted) {
+        setState(() {
+          _isOffline = offline;
+        });
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _connectivitySubscription?.cancel();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -141,7 +284,13 @@ class BayyinahCloneApp extends StatelessWidget {
       scaffoldMessengerKey: rootScaffoldMessengerKey,
       navigatorKey: navigatorKey,
       title: 'Basirah TV',
-      theme: themeProvider.currentTheme,
+      theme: themeProvider.currentTheme.copyWith(
+        snackBarTheme: SnackBarThemeData(
+          behavior: SnackBarBehavior.floating,
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.0)),
+        ),
+      ),
       home: SplashScreen(),
       routes: {
         '/signup': (context) => SignUpPage(),
@@ -149,11 +298,18 @@ class BayyinahCloneApp extends StatelessWidget {
         '/account': (context) => AccountPage(),
         '/faq': (context) => FaqPage(),
         '/profile': (context) => const ProfilePage(),
-        '/edit-profile': (context) =>
-            const EditProfilePage(), // <-- ADDED ROUTE
+        '/edit-profile': (context) => const EditProfilePage(),
         '/home': (context) => const MainScreen(),
       },
       debugShowCheckedModeBanner: false,
+      builder: (context, child) {
+        return Stack(
+          children: [
+            child!,
+            if (_isOffline) const NoInternetOverlay(),
+          ],
+        );
+      },
     );
   }
 }
@@ -173,6 +329,11 @@ class MainScreen extends StatefulWidget {
 class _MainScreenState extends State<MainScreen> {
   int _currentIndex = 0;
 
+  late Connectivity _connectivity;
+  late Stream<ConnectivityResult> _connectivityStream;
+  StreamSubscription<ConnectivityResult>? _connectivitySubscription;
+  bool _isOffline = false;
+
   final List<Widget> _pages = [
     const HomePage(),
     const LibraryPage(),
@@ -180,17 +341,75 @@ class _MainScreenState extends State<MainScreen> {
     const MyListPage(),
   ];
 
+  void _showCustomSnackBar(SnackBar snackBar) {
+    final bottomPadding = MediaQuery.of(context).padding.bottom;
+
+    // 1. HEIGHT LOGIC
+    const double navBarHeight = 56.0; // Height of BottomNavigationBarWidget
+    const double miniPlayerHeight = 56.0; // Height of MiniAudioPlayerBar
+
+    // 2. VISIBILITY LOGIC
+    // Determine if the player is currently shown.
+    // Usually you check this via a Provider.
+    // Replace 'true' with your actual condition (e.g. audioProvider.isPlaying)
+    bool isMiniPlayerVisible = true;
+
+    // 3. CALCULATION
+    // If player is visible, push it 112px (56+56)
+    // If player is hidden, push it 56px (just the nav bar)
+    double totalBottomOffset =
+        navBarHeight + (isMiniPlayerVisible ? miniPlayerHeight : 0);
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: snackBar.content,
+        backgroundColor: snackBar.backgroundColor,
+        duration: snackBar.duration,
+        behavior: SnackBarBehavior.floating,
+        margin: EdgeInsets.only(
+          left: 16.0,
+          right: 16.0,
+          bottom: totalBottomOffset + bottomPadding,
+        ),
+        shape: snackBar.shape ??
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.0)),
+      ),
+    );
+  }
+
   @override
   void initState() {
     super.initState();
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
     authProvider.addListener(_onAuthStateChanged);
 
-    // This logic correctly shows the post-login message safely
-    // after the MainScreen has been built.
+    _connectivity = Connectivity();
+    _connectivityStream = _connectivity.onConnectivityChanged;
+    _connectivitySubscription = _connectivityStream.listen((result) {
+      final offline = result == ConnectivityResult.none;
+      if (offline != _isOffline && mounted) {
+        setState(() {
+          _isOffline = offline;
+        });
+        if (offline) {
+          _showCustomSnackBar(
+            const SnackBar(
+              content:
+                  Text('No network connection', textAlign: TextAlign.center),
+              backgroundColor: Colors.red,
+              duration: Duration(days: 1),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        } else {
+          ScaffoldMessenger.of(context).hideCurrentSnackBar();
+        }
+      }
+    });
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (widget.postLoginMessage != null && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        _showCustomSnackBar(
           SnackBar(
             content: Text(
               widget.postLoginMessage!,
@@ -201,16 +420,11 @@ class _MainScreenState extends State<MainScreen> {
               textAlign: TextAlign.center,
             ),
             backgroundColor: Colors.green,
-            behavior: SnackBarBehavior.floating,
-            margin:
-                const EdgeInsets.symmetric(horizontal: 24.0, vertical: 100.0),
-            shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10.0)),
             duration: const Duration(seconds: 4),
+            behavior: SnackBarBehavior.floating,
           ),
         );
       }
-
       _triggerInitialDataFetch();
     });
   }
@@ -219,6 +433,7 @@ class _MainScreenState extends State<MainScreen> {
   void dispose() {
     Provider.of<AuthProvider>(context, listen: false)
         .removeListener(_onAuthStateChanged);
+    _connectivitySubscription?.cancel();
     super.dispose();
   }
 
@@ -251,6 +466,7 @@ class _MainScreenState extends State<MainScreen> {
     final themeProvider = Provider.of<ThemeProvider>(context);
 
     return Scaffold(
+      resizeToAvoidBottomInset: false,
       appBar: HeaderNavigationBar(
         onNotificationTapped: () {
           Navigator.push(

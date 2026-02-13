@@ -26,7 +26,7 @@ class BasirahAudioHandler extends BaseAudioHandler with SeekHandler {
         androidNotificationOngoing: true,
         androidStopForegroundOnPause: true,
       ),
-    ) as BasirahAudioHandler;
+    );
     return _instance!;
   }
 
