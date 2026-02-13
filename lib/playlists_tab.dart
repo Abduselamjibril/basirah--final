@@ -14,7 +14,7 @@ class PlaylistsTab extends StatefulWidget {
 }
 
 class _PlaylistsTabState extends State<PlaylistsTab>
-  with AutomaticKeepAliveClientMixin<PlaylistsTab> {
+    with AutomaticKeepAliveClientMixin<PlaylistsTab> {
   // Use the new strongly-typed model
   List<Playlist> _playlists = [];
   List<Playlist> _filteredPlaylists = [];
@@ -266,9 +266,11 @@ class _PlaylistsTabState extends State<PlaylistsTab>
                           child: _filteredPlaylists.isEmpty
                               ? _buildEmptyState()
                               : ListView.separated(
-                                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 80),
+                                  padding:
+                                      const EdgeInsets.fromLTRB(16, 0, 16, 80),
                                   itemCount: _filteredPlaylists.length,
-                                  separatorBuilder: (_, __) => const SizedBox(height: 10),
+                                  separatorBuilder: (_, __) =>
+                                      const SizedBox(height: 10),
                                   itemBuilder: (context, index) {
                                     final playlist = _filteredPlaylists[index];
                                     return _buildPlaylistCard(playlist);

@@ -27,7 +27,7 @@ class BookmarksTab extends StatefulWidget {
 }
 
 class _BookmarksTabState extends State<BookmarksTab>
-  with AutomaticKeepAliveClientMixin<BookmarksTab> {
+    with AutomaticKeepAliveClientMixin<BookmarksTab> {
   // --- STATE MANAGEMENT REFACTORED ---
   final BookmarkService _bookmarkService = BookmarkService();
   List<dynamic> _allBookmarks = []; // This holds the raw API response

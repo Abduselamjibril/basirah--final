@@ -196,28 +196,28 @@ class _StoryNightPageState extends State<StoryNightPage> {
   void _showSuccessSnackbar(String message) {
     if (!mounted) return;
     final isNightMode =
-      Provider.of<ThemeProvider>(context, listen: false).isDarkMode;
+        Provider.of<ThemeProvider>(context, listen: false).isDarkMode;
     ScaffoldMessenger.of(context).removeCurrentSnackBar();
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text(message),
-      backgroundColor:
-        isNightMode ? Colors.grey[700] : const Color(0xFF009B77),
-      behavior: SnackBarBehavior.floating,
-      margin: const EdgeInsets.only(left: 24.0, right: 24.0, bottom: 80.0),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-      duration: const Duration(seconds: 2)));
+        content: Text(message),
+        backgroundColor:
+            isNightMode ? Colors.grey[700] : const Color(0xFF009B77),
+        behavior: SnackBarBehavior.floating,
+        margin: const EdgeInsets.only(left: 24.0, right: 24.0, bottom: 80.0),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        duration: const Duration(seconds: 2)));
   }
 
   void _showErrorSnackbar(String message) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).removeCurrentSnackBar();
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text(message),
-      backgroundColor: Colors.redAccent.shade700,
-      behavior: SnackBarBehavior.floating,
-      margin: const EdgeInsets.only(left: 24.0, right: 24.0, bottom: 80.0),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-      duration: const Duration(seconds: 3)));
+        content: Text(message),
+        backgroundColor: Colors.redAccent.shade700,
+        behavior: SnackBarBehavior.floating,
+        margin: const EdgeInsets.only(left: 24.0, right: 24.0, bottom: 80.0),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        duration: const Duration(seconds: 3)));
   }
 
   void _prefetchImages(List<dynamic> items, {int limit = 12}) {
@@ -384,16 +384,16 @@ class _StoryNightPageState extends State<StoryNightPage> {
                     width: double.infinity,
                     color: isNightMode ? Colors.grey[800] : Colors.grey[300],
                     child: hasImage
-                      ? CachedNetworkImage(
-                        imageUrl: imageUrl,
-                        fit: BoxFit.fill,
-                        placeholder: (context, url) => const Center(
-                          child:
-                            CircularProgressIndicator(strokeWidth: 2)),
-                        errorWidget: (context, url, error) => Center(
-                          child: Icon(Icons.broken_image_outlined,
-                            color: Colors.grey[500])),
-                        )
+                        ? CachedNetworkImage(
+                            imageUrl: imageUrl,
+                            fit: BoxFit.fill,
+                            placeholder: (context, url) => const Center(
+                                child:
+                                    CircularProgressIndicator(strokeWidth: 2)),
+                            errorWidget: (context, url, error) => Center(
+                                child: Icon(Icons.broken_image_outlined,
+                                    color: Colors.grey[500])),
+                          )
                         : Center(
                             child: Icon(Icons.image_not_supported_outlined,
                                 color: Colors.grey[500])),

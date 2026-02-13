@@ -226,7 +226,8 @@ class _MyLearningPageState extends State<MyLearningPage> {
     final urls = <String>[];
     for (final item in items) {
       if (item is! Map<String, dynamic>) continue;
-      final contentType = (item['content_type']?.toString() ?? '').toLowerCase();
+      final contentType =
+          (item['content_type']?.toString() ?? '').toLowerCase();
       final imagePath = item['image_path']?.toString();
       final imageUrlFromApi = item['image_url']?.toString();
       String? url;
@@ -636,14 +637,15 @@ class _MyLearningPageState extends State<MyLearningPage> {
             _navigateToDetail(contentType, originalData, context);
           } else {
             _logger.e('Invalid contentId ($contentId)');
-            ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('Cannot open invalid content.'),
-                  behavior: SnackBarBehavior.floating,
-                  margin: const EdgeInsets.only(left: 24.0, right: 24.0, bottom: 80.0),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                  duration: const Duration(seconds: 3),
-                ));
+            ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+              content: Text('Cannot open invalid content.'),
+              behavior: SnackBarBehavior.floating,
+              margin:
+                  const EdgeInsets.only(left: 24.0, right: 24.0, bottom: 80.0),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10)),
+              duration: const Duration(seconds: 3),
+            ));
           }
         },
         child: Padding(
@@ -660,25 +662,25 @@ class _MyLearningPageState extends State<MyLearningPage> {
                 child: displayImageUrl != null && displayImageUrl.isNotEmpty
                     ? ClipRRect(
                         borderRadius: BorderRadius.circular(8),
-                    child: CachedNetworkImage(
-                      imageUrl: displayImageUrl,
-                      width: 70,
-                      height: 70,
-                      fit: BoxFit.cover,
-                      cacheManager: _cacheManager,
-                      placeholder: (ctx, url) => Center(
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          valueColor: AlwaysStoppedAnimation<Color>(
-                            primaryColor))),
-                      errorWidget: (ctx, url, err) {
-                      _logger.e('Failed img load: $displayImageUrl', err);
-                      return Center(
-                        child: Icon(typeIcon,
-                          size: 36,
-                          color: subTextColor.withOpacity(0.8)));
-                      },
-                    ),
+                        child: CachedNetworkImage(
+                          imageUrl: displayImageUrl,
+                          width: 70,
+                          height: 70,
+                          fit: BoxFit.cover,
+                          cacheManager: _cacheManager,
+                          placeholder: (ctx, url) => Center(
+                              child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                      primaryColor))),
+                          errorWidget: (ctx, url, err) {
+                            _logger.e('Failed img load: $displayImageUrl', err);
+                            return Center(
+                                child: Icon(typeIcon,
+                                    size: 36,
+                                    color: subTextColor.withOpacity(0.8)));
+                          },
+                        ),
                       )
                     : Center(
                         child: Icon(typeIcon,
@@ -786,8 +788,10 @@ class _MyLearningPageState extends State<MyLearningPage> {
             ScaffoldMessenger.of(currentContext).showSnackBar(SnackBar(
               content: Text('Cannot open details.'),
               behavior: SnackBarBehavior.floating,
-              margin: const EdgeInsets.only(left: 24.0, right: 24.0, bottom: 80.0),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              margin:
+                  const EdgeInsets.only(left: 24.0, right: 24.0, bottom: 80.0),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10)),
               duration: const Duration(seconds: 3),
             ));
           return;
@@ -799,7 +803,8 @@ class _MyLearningPageState extends State<MyLearningPage> {
           content: Text('Error preparing details.'),
           behavior: SnackBarBehavior.floating,
           margin: const EdgeInsets.only(left: 24.0, right: 24.0, bottom: 80.0),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
           duration: const Duration(seconds: 3),
         ));
       return;

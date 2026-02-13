@@ -165,25 +165,25 @@ class _SurahPageState extends State<SurahPage> {
     if (!mounted) return;
     final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text(message),
-      backgroundColor: themeProvider.isDarkMode
-        ? Colors.grey[700]
-        : const Color(0xFF009B77),
-      behavior: SnackBarBehavior.floating,
-      margin: const EdgeInsets.only(left: 24.0, right: 24.0, bottom: 80.0),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-      duration: const Duration(seconds: 2)));
+        content: Text(message),
+        backgroundColor: themeProvider.isDarkMode
+            ? Colors.grey[700]
+            : const Color(0xFF009B77),
+        behavior: SnackBarBehavior.floating,
+        margin: const EdgeInsets.only(left: 24.0, right: 24.0, bottom: 80.0),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        duration: const Duration(seconds: 2)));
   }
 
   void _showErrorSnackbar(String message) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text(message),
-      backgroundColor: Colors.redAccent.shade700,
-      behavior: SnackBarBehavior.floating,
-      margin: const EdgeInsets.only(left: 24.0, right: 24.0, bottom: 80.0),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-      duration: const Duration(seconds: 3)));
+        content: Text(message),
+        backgroundColor: Colors.redAccent.shade700,
+        behavior: SnackBarBehavior.floating,
+        margin: const EdgeInsets.only(left: 24.0, right: 24.0, bottom: 80.0),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        duration: const Duration(seconds: 3)));
   }
 
   @override
