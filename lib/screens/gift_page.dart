@@ -21,15 +21,20 @@ class _GiftPageState extends State<GiftPage> {
   // Pricing constants
   static const int _sixMonthPrice = 6000;
   static const int _yearlyPrice = 12000;
+  static const int _sixMonthPriceUsd = 50;
+  static const int _yearlyPriceUsd = 100;
 
   // Form and controller for the payment dialog
   final _formKey = GlobalKey<FormState>();
   final _transactionIdController = TextEditingController();
+  final _internationalFormKey = GlobalKey<FormState>();
+  final _internationalTransactionIdController = TextEditingController();
   final PaymentService _paymentService = PaymentService();
 
   @override
   void dispose() {
     _transactionIdController.dispose();
+    _internationalTransactionIdController.dispose();
     super.dispose();
   }
 
@@ -70,8 +75,11 @@ class _GiftPageState extends State<GiftPage> {
 
   int get _totalPrice =>
       (_isYearly ? _yearlyPrice : _sixMonthPrice) * _quantity;
+    int get _totalPriceUsd =>
+      (_isYearly ? _yearlyPriceUsd : _sixMonthPriceUsd) * _quantity;
   String get _planName => _isYearly ? '1-Year Gift' : '6-Month Gift';
   String get _planDuration => _isYearly ? 'yearly' : 'six_month';
+    String get _planDurationText => _isYearly ? '/year' : '/6 months';
 
   /// Displays the dialog for the manual gift payment.
   void _showManualGiftDialog() {
@@ -83,7 +91,7 @@ class _GiftPageState extends State<GiftPage> {
       builder: (ctx) {
         return StatefulBuilder(builder: (context, setDialogState) {
           return AlertDialog(
-            title: const Text('Manual Payment for Gifts'),
+            title: const Text('Local Payment for Gifts'),
             content: Form(
               key: _formKey,
               child: SingleChildScrollView(
@@ -97,11 +105,13 @@ class _GiftPageState extends State<GiftPage> {
                     const Text(
                         'Please transfer the total amount to the account below:'),
                     const SizedBox(height: 8),
-                    const Text('Bank: Commercial Bank of Ethiopia',
+                      const Text('Bank: Commercial Bank of Ethiopia',
                         style: TextStyle(fontWeight: FontWeight.bold)),
-                    const Text('Account: 1000123456789',
+                      const Text('Account: 1000746793492',
                         style: TextStyle(fontWeight: FontWeight.bold)),
-                    const Text('Name: Your Company Name Here',
+                      const Text('Name: Mr. Fitsum kibrom',
+                        style: TextStyle(fontWeight: FontWeight.bold)),
+                      const Text('Company: Basirah Tv',
                         style: TextStyle(fontWeight: FontWeight.bold)),
                     const SizedBox(height: 24),
                     const Text(
@@ -183,6 +193,118 @@ class _GiftPageState extends State<GiftPage> {
     );
   }
 
+  /// Displays the dialog for the international gift payment.
+  void _showInternationalGiftDialog() {
+    _internationalTransactionIdController.clear();
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) {
+        return StatefulBuilder(builder: (context, setDialogState) {
+          return AlertDialog(
+            title: const Text('International Payment for Gifts'),
+            content: Form(
+              key: _internationalFormKey,
+              child: SingleChildScrollView(
+                child: ListBody(
+                  children: <Widget>[
+                    Text(
+                      'You are purchasing $_quantity x $_planName for a total of \$$_totalPriceUsd.',
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 16),
+                    const Text(
+                      'Direct Deposit Details',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 12),
+                    const Text('Bank: M&T Bank'),
+                    const Text('Account Type: Checking'),
+                    const Text('Account Number: 9899088877'),
+                    const Text('ABA/Routing Number: 052000113'),
+                    const Text('Beneficiary: CAPITOL CARE'),
+                    const SizedBox(height: 16),
+                    const Text(
+                        'After paying, enter the transaction ID from your bank.'),
+                    const SizedBox(height: 8),
+                    TextFormField(
+                      controller: _internationalTransactionIdController,
+                      decoration: const InputDecoration(
+                          labelText: 'Transaction ID',
+                          border: OutlineInputBorder(),
+                          hintText: 'e.g. WT230512ABCDE'),
+                      validator: (value) {
+                        if (value == null || value.trim().isEmpty) {
+                          return 'Please enter a transaction ID.';
+                        }
+                        return null;
+                      },
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            actions: <Widget>[
+              TextButton(
+                style: TextButton.styleFrom(
+                  foregroundColor: Colors.red,
+                ),
+                onPressed: _isLoading ? null : () => Navigator.of(ctx).pop(),
+                child: const Text('Cancel'),
+              ),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF009B77),
+                  foregroundColor: Colors.white,
+                ),
+                onPressed: _isLoading
+                    ? null
+                    : () async {
+                        if (_internationalFormKey.currentState!.validate()) {
+                          setDialogState(() => _isLoading = true);
+
+                          try {
+                            await _paymentService.submitGiftPurchase(
+                              planDuration: _planDuration,
+                              quantity: _quantity,
+                              totalPrice: _totalPrice,
+                              transactionId:
+                                  _internationalTransactionIdController.text,
+                            );
+
+                            if (mounted) {
+                              Navigator.of(ctx).pop();
+                              _showSuccessMessage(
+                                  'Gift purchase submitted for review!');
+                            }
+                          } catch (e) {
+                            if (mounted) {
+                              Navigator.of(ctx).pop();
+                              _showErrorDialog(e.toString());
+                            }
+                          } finally {
+                            if (mounted) {
+                              setDialogState(() => _isLoading = false);
+                            }
+                          }
+                        }
+                      },
+                child: _isLoading
+                    ? const SizedBox(
+                        height: 20,
+                        width: 20,
+                        child: CircularProgressIndicator(
+                            strokeWidth: 2, color: Colors.white))
+                    : const Text('Submit for Approval'),
+              ),
+            ],
+          );
+        });
+      },
+    );
+  }
+
   // --- WIDGET BUILD METHODS ---
   @override
   Widget build(BuildContext context) {
@@ -202,6 +324,8 @@ class _GiftPageState extends State<GiftPage> {
               onProfileTapped: () {/* TODO: Implement navigation */},
               onGiftTapped: () {/* Already on this page, do nothing */},
               onThemeToggle: themeProvider.toggleTheme,
+              titleLeftPaddingLight: -2.0,
+              titleLeftPaddingDark: -2.0,
             ),
           ),
           SliverPadding(
@@ -300,6 +424,20 @@ class _GiftPageState extends State<GiftPage> {
   }
 
   Widget _buildGiftCard(bool isDarkMode, Color primaryColor) {
+    final TextStyle priceTextStyle = TextStyle(
+      fontSize: 30,
+      fontWeight: FontWeight.w800,
+      color: primaryColor,
+      letterSpacing: -0.3,
+      shadows: [
+        Shadow(
+          color: primaryColor.withOpacity(isDarkMode ? 0.35 : 0.2),
+          blurRadius: 12,
+          offset: const Offset(0, 3),
+        ),
+      ],
+    );
+
     return Container(
       width: double.infinity,
       margin: const EdgeInsets.only(top: 16),
@@ -360,12 +498,53 @@ class _GiftPageState extends State<GiftPage> {
                     fontSize: 16,
                     color: isDarkMode ? Colors.grey[400] : Colors.grey[600])),
             const SizedBox(height: 8),
-            Text(
-              '$_totalPrice ETB',
-              style: TextStyle(
-                  fontSize: 42,
-                  fontWeight: FontWeight.w800,
-                  color: primaryColor),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.baseline,
+                  textBaseline: TextBaseline.alphabetic,
+                  children: [
+                    Text(
+                      '\$$_totalPriceUsd',
+                      style: priceTextStyle,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      _planDurationText,
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w500,
+                        color:
+                            isDarkMode ? Colors.grey[300] : Colors.grey[700],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.baseline,
+                  textBaseline: TextBaseline.alphabetic,
+                  children: [
+                    Text(
+                      '$_totalPrice',
+                      style: priceTextStyle,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      _planDurationText,
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w500,
+                        color:
+                            isDarkMode ? Colors.grey[300] : Colors.grey[700],
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ),
             Text(
               'for $_quantity x $_planName',
@@ -376,21 +555,57 @@ class _GiftPageState extends State<GiftPage> {
             const SizedBox(height: 32),
 
             // Proceed Button
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: _showManualGiftDialog,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: primaryColor,
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12)),
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                ),
-                child: const Text('Proceed to Pay',
-                    style:
-                        TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+            Text(
+              'Choose payment method',
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: isDarkMode ? Colors.grey[400] : Colors.grey[700],
               ),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: _isLoading ? null : _showManualGiftDialog,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: primaryColor,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12)),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                    ),
+                    child: _isLoading
+                        ? const SizedBox(
+                            height: 22,
+                            width: 22,
+                            child: CircularProgressIndicator(
+                                strokeWidth: 3, color: Colors.white),
+                          )
+                        : const Text('Local Pay',
+                            style: TextStyle(
+                                fontWeight: FontWeight.bold, fontSize: 15)),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed:
+                        _isLoading ? null : _showInternationalGiftDialog,
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: primaryColor,
+                      side: BorderSide(color: primaryColor, width: 1.5),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12)),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                    ),
+                    child: const Text('International Pay',
+                        style: TextStyle(
+                            fontWeight: FontWeight.bold, fontSize: 15)),
+                  ),
+                ),
+              ],
             ),
           ],
         ),

@@ -15,6 +15,8 @@ class HeaderNavigationBar extends StatelessWidget
   // REMOVED: onFaqTapped is no longer needed.
   // NEW: Added onGiftTapped callback.
   final VoidCallback onGiftTapped;
+  final double? titleLeftPaddingLight;
+  final double? titleLeftPaddingDark;
 
   const HeaderNavigationBar({
     super.key,
@@ -22,6 +24,8 @@ class HeaderNavigationBar extends StatelessWidget
     required this.onProfileTapped,
     required this.onThemeToggle,
     required this.onGiftTapped, // NEW
+    this.titleLeftPaddingLight,
+    this.titleLeftPaddingDark,
   });
 
   @override
@@ -51,8 +55,8 @@ class HeaderNavigationBar extends StatelessWidget
             padding: EdgeInsets.only(
               top: isNightMode ? 16.0 : 4.0, // Move down in dark mode
               left: isNightMode
-                  ? 4.0
-                  : 16.0, // Decrease left padding in dark mode
+                  ? (titleLeftPaddingDark ?? 4.0)
+                  : (titleLeftPaddingLight ?? 16.0),
               right: 0.0,
               bottom: 0.0,
             ),
@@ -72,24 +76,12 @@ class HeaderNavigationBar extends StatelessWidget
               icon: Icon(isNightMode ? Icons.light_mode : Icons.dark_mode),
               color: iconColor,
             ),
-
-            // --- NEW: Gift Icon Button ---
             IconButton(
               tooltip: 'Gift a Subscription',
               onPressed: onGiftTapped,
               icon: const Icon(Icons.card_giftcard),
               color: iconColor,
             ),
-            // --- END NEW ---
-
-            // REMOVED: The FAQ IconButton has been replaced by the Gift Icon.
-            // IconButton(
-            //   tooltip: 'FAQ',
-            //   onPressed: onFaqTapped,
-            //   icon: const Icon(Icons.help_outline),
-            //   color: iconColor,
-            // ),
-
             badges.Badge(
               position: badges.BadgePosition.topEnd(top: 4, end: 4),
               badgeContent: Text(

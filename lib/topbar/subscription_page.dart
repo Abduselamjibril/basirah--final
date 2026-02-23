@@ -19,11 +19,14 @@ class _SubscriptionPageState extends State<SubscriptionPage> {
   final PaymentService _paymentService = PaymentService();
   final _formKey = GlobalKey<FormState>();
   final _transactionIdController = TextEditingController();
+  final _internationalFormKey = GlobalKey<FormState>();
+  final _internationalTransactionIdController = TextEditingController();
 
   @override
   void dispose() {
     // Clean up the controller when the widget is disposed.
     _transactionIdController.dispose();
+    _internationalTransactionIdController.dispose();
     super.dispose();
   }
 
@@ -72,7 +75,7 @@ class _SubscriptionPageState extends State<SubscriptionPage> {
         return StatefulBuilder(
           builder: (context, setDialogState) {
             return AlertDialog(
-              title: const Text('Manual Payment Instructions'),
+              title: const Text('Local Payment Instructions'),
               content: Form(
                 key: _formKey,
                 child: SingleChildScrollView(
@@ -88,9 +91,11 @@ class _SubscriptionPageState extends State<SubscriptionPage> {
                       const SizedBox(height: 8),
                       const Text('Bank: Commercial Bank of Ethiopia',
                           style: TextStyle(fontWeight: FontWeight.bold)),
-                      const Text('Account: 1000123456789',
+                        const Text('Account: 1000746793492',
                           style: TextStyle(fontWeight: FontWeight.bold)),
-                      const Text('Name: Your Company Name Here',
+                        const Text('Name: Mr. Fitsum kibrom',
+                          style: TextStyle(fontWeight: FontWeight.bold)),
+                        const Text('Company: Basirah Tv',
                           style: TextStyle(fontWeight: FontWeight.bold)),
                       const SizedBox(height: 24),
                       const Text(
@@ -183,6 +188,132 @@ class _SubscriptionPageState extends State<SubscriptionPage> {
     );
   }
 
+  /// Displays the dialog for international payment instructions.
+  void _showInternationalPaymentDialog() {
+    _internationalTransactionIdController.clear();
+
+    final String planTitle = _isYearly ? 'Annual Plan' : '6 Month Plan';
+    final String priceUSD = _isYearly ? '\$100' : '\$50';
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              title: const Text('International Payment Instructions'),
+              content: Form(
+                key: _internationalFormKey,
+                child: SingleChildScrollView(
+                  child: ListBody(
+                    children: <Widget>[
+                      Text(
+                        'You have selected the $planTitle for $priceUSD.',
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 16),
+                      const Text(
+                        'Direct Deposit Details',
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 12),
+                      const Text('Bank: M&T Bank'),
+                      const Text('Account Type: Checking'),
+                      const Text('Account Number: 9899088877'),
+                      const Text('ABA/Routing Number: 052000113'),
+                      const Text('Beneficiary: CAPITOL CARE'),
+                      const SizedBox(height: 16),
+                      const Text(
+                        'After paying, enter the transaction ID from your bank receipt below.',
+                      ),
+                      const SizedBox(height: 8),
+                      TextFormField(
+                        controller: _internationalTransactionIdController,
+                        decoration: const InputDecoration(
+                          labelText: 'Transaction ID',
+                          border: OutlineInputBorder(),
+                          hintText: 'e.g. WT230512ABCDE',
+                        ),
+                        validator: (value) {
+                          if (value == null || value.trim().isEmpty) {
+                            return 'Please enter a transaction ID.';
+                          }
+                          return null;
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              actions: <Widget>[
+                TextButton(
+                  style: TextButton.styleFrom(
+                    foregroundColor: Colors.red,
+                  ),
+                  onPressed: _isLoading ? null : () => Navigator.of(ctx).pop(),
+                  child: const Text('Cancel'),
+                ),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF009B77),
+                    foregroundColor: Colors.white,
+                  ),
+                  onPressed: _isLoading
+                      ? null
+                      : () async {
+                          if (_internationalFormKey.currentState!.validate()) {
+                            setDialogState(() {
+                              _isLoading = true;
+                            });
+
+                            final plan = _isYearly ? 'yearly' : 'six_month';
+                            final transactionId =
+                                _internationalTransactionIdController.text;
+
+                            try {
+                              await _paymentService.submitManualPayment(
+                                  plan: plan, transactionId: transactionId);
+
+                              if (mounted) {
+                                Navigator.of(ctx).pop();
+                                _showSuccessMessage(
+                                    'Request submitted! Your subscription will be activated after admin review.');
+                              }
+                            } catch (e) {
+                              if (mounted) {
+                                Navigator.of(ctx).pop();
+                                _showErrorDialog(e.toString());
+                              }
+                            } finally {
+                              if (mounted) {
+                                setDialogState(() {
+                                  _isLoading = false;
+                                });
+                                setState(() {
+                                  _isLoading = false;
+                                });
+                              }
+                            }
+                          }
+                        },
+                  child: _isLoading
+                      ? const SizedBox(
+                          height: 20,
+                          width: 20,
+                          child: CircularProgressIndicator(
+                              strokeWidth: 2, color: Colors.white),
+                        )
+                      : const Text('Submit for Approval'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
   // --- WIDGET BUILD METHODS (Unchanged) ---
   @override
   Widget build(BuildContext context) {
@@ -201,6 +332,8 @@ class _SubscriptionPageState extends State<SubscriptionPage> {
               onProfileTapped: () {},
               onGiftTapped: () {}, // Added required parameter
               onThemeToggle: themeProvider.toggleTheme,
+              titleLeftPaddingLight: -2.0,
+              titleLeftPaddingDark: -2.0,
             ),
           ),
           SliverPadding(
@@ -313,8 +446,22 @@ class _SubscriptionPageState extends State<SubscriptionPage> {
         ? 'Pay once for the whole year.'
         : 'Great value for half a year.';
     final String priceUSD = _isYearly ? '\$100' : '\$50';
-    final String priceETB = _isYearly ? '12,000 ETB' : '6,000 ETB';
+    final String priceETBCompact = _isYearly ? '12000' : '6000';
     final String durationText = _isYearly ? '/year' : '/6 months';
+    final Color priceTextColor = primaryColor;
+    final TextStyle priceTextStyle = TextStyle(
+      fontSize: 30,
+      fontWeight: FontWeight.w800,
+      color: priceTextColor,
+      letterSpacing: -0.3,
+      shadows: [
+        Shadow(
+          color: priceTextColor.withOpacity(isDarkMode ? 0.35 : 0.2),
+          blurRadius: 12,
+          offset: const Offset(0, 3),
+        ),
+      ],
+    );
 
     return Container(
       width: double.infinity,
@@ -374,63 +521,108 @@ class _SubscriptionPageState extends State<SubscriptionPage> {
               ),
             ),
             const SizedBox(height: 24),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.baseline,
-              textBaseline: TextBaseline.alphabetic,
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  priceUSD,
-                  style: TextStyle(
-                    fontSize: 42,
-                    fontWeight: FontWeight.w800,
-                    color: primaryColor,
-                  ),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.baseline,
+                  textBaseline: TextBaseline.alphabetic,
+                  children: [
+                    Text(
+                      priceUSD,
+                      style: priceTextStyle,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      durationText,
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w500,
+                        color: isDarkMode ? Colors.grey[300] : Colors.grey[700],
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(width: 8),
-                Text(
-                  durationText,
-                  style: TextStyle(
-                    fontSize: 16,
-                    color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
-                  ),
+                const SizedBox(height: 6),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.baseline,
+                  textBaseline: TextBaseline.alphabetic,
+                  children: [
+                    Text(
+                      priceETBCompact,
+                      style: priceTextStyle,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      durationText,
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w500,
+                        color: isDarkMode ? Colors.grey[300] : Colors.grey[700],
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
-            const SizedBox(height: 4),
+            const SizedBox(height: 32),
             Text(
-              priceETB,
+              'Choose payment method',
               style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w500,
-                color: isDarkMode ? Colors.grey[300] : Colors.grey[700],
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: isDarkMode ? Colors.grey[400] : Colors.grey[700],
               ),
             ),
-            const SizedBox(height: 32),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: _isLoading ? null : _showManualPaymentDialog,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: primaryColor,
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                ),
-                child: _isLoading
-                    ? const SizedBox(
-                        height: 24,
-                        width: 24,
-                        child: CircularProgressIndicator(
-                            strokeWidth: 3, color: Colors.white),
-                      )
-                    : Text(
-                        'Get $planTitle',
-                        style: const TextStyle(
-                            fontWeight: FontWeight.bold, fontSize: 16),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: _isLoading ? null : _showManualPaymentDialog,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: primaryColor,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
                       ),
-              ),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                    ),
+                    child: _isLoading
+                        ? const SizedBox(
+                            height: 22,
+                            width: 22,
+                            child: CircularProgressIndicator(
+                                strokeWidth: 3, color: Colors.white),
+                          )
+                        : const Text(
+                            'Local Pay',
+                            style: TextStyle(
+                                fontWeight: FontWeight.bold, fontSize: 15),
+                          ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed:
+                        _isLoading ? null : _showInternationalPaymentDialog,
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: primaryColor,
+                      side: BorderSide(color: primaryColor, width: 1.5),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                    ),
+                    child: const Text(
+                      'International Pay',
+                      style: TextStyle(
+                          fontWeight: FontWeight.bold, fontSize: 15),
+                    ),
+                  ),
+                ),
+              ],
             ),
           ],
         ),
