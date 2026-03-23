@@ -5,31 +5,23 @@ namespace App\Http\Controllers;
 use App\Models\Course;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Cache;
+use App\Http\Traits\ChecksContentAccess;
+use App\Http\Resources\CourseResource;
 
 class CourseController extends Controller
 {
+    use ChecksContentAccess;
+
     /**
      * The index method fetches courses with their episode counts.
      */
     public function index()
     {
-        $courses = Course::withCount('episodes')->latest()->get();
-
-        $transformedCourses = $courses->map(function ($course) {
-            return [
-                'id' => $course->id,
-                'name' => $course->name,
-                'description' => $course->description,
-                'image_path' => $course->image_path ? Storage::disk('public')->url($course->image_path) : null,
-                'is_premium' => (bool) $course->is_premium,
-                'category' => $course->category,
-                'episodes_count' => $course->episodes_count,
-                'created_at' => $course->created_at->toDateTimeString(),
-                'updated_at' => $course->updated_at->toDateTimeString(),
-            ];
+        $courses = Cache::remember('courses_all', 3600, function () {
+            return Course::withCount('episodes')->latest()->get();
         });
-
-        return response()->json(['data' => $transformedCourses]);
+        return CourseResource::collection($courses);
     }
 
     /**
@@ -53,21 +45,14 @@ class CourseController extends Controller
             'category' => $request->category,
         ]);
 
-        $transformedCourse = [
-            'id' => $course->id,
-            'name' => $course->name,
-            'description' => $course->description,
-            'image_path' => Storage::disk('public')->url($course->image_path),
-            'is_premium' => (bool) $course->is_premium,
-            'category' => $course->category,
-            'episodes_count' => 0,
-            'created_at' => $course->created_at->toDateTimeString(),
-            'updated_at' => $course->updated_at->toDateTimeString(),
-        ];
+        // Load episodes count to match resource expectation
+        $course->setAttribute('episodes_count', 0);
+
+        Cache::forget('courses_all');
 
         return response()->json([
             'message' => 'Course created successfully.',
-            'data' => $transformedCourse
+            'data' => new CourseResource($course)
         ], 201);
     }
 
@@ -77,21 +62,7 @@ class CourseController extends Controller
     public function show($id)
     {
         $course = Course::withCount('episodes')->findOrFail($id);
-
-        $transformedCourse = [
-            'id' => $course->id,
-            'name' => $course->name,
-            'description' => $course->description,
-            'image_path' => $course->image_path ? Storage::disk('public')->url($course->image_path) : null,
-            'is_premium' => (bool) $course->is_premium,
-            'category' => $course->category,
-            'episodes_count' => $course->episodes_count,
-            'created_at' => $course->created_at->toDateTimeString(),
-            'updated_at' => $course->updated_at->toDateTimeString(),
-        ];
-
-        // --- FIX: Consistently wrap the response in a 'data' key ---
-        return response()->json(['data' => $transformedCourse]);
+        return new CourseResource($course);
     }
 
     /**
@@ -120,21 +91,11 @@ class CourseController extends Controller
         $course->update($courseData);
         $course->loadCount('episodes');
 
-        $transformedCourse = [
-            'id' => $course->id,
-            'name' => $course->name,
-            'description' => $course->description,
-            'image_path' => $course->image_path ? Storage::disk('public')->url($course->image_path) : null,
-            'is_premium' => (bool) $course->is_premium,
-            'category' => $course->category,
-            'episodes_count' => $course->episodes_count,
-            'created_at' => $course->created_at->toDateTimeString(),
-            'updated_at' => $course->updated_at->toDateTimeString(),
-        ];
+        Cache::forget('courses_all');
 
         return response()->json([
             'message' => 'Course updated successfully.',
-            'data' => $transformedCourse
+            'data' => new CourseResource($course)
         ], 200);
     }
 
@@ -145,24 +106,10 @@ class CourseController extends Controller
             Storage::disk('public')->delete($course->image_path);
         }
         $course->delete();
+        
+        Cache::forget('courses_all');
+        
         return response()->json(['message' => 'Course deleted successfully.'], 200);
-    }
-
-    // --- FIX START: Return the updated course data from lock/unlock ---
-    private function transformCourseForResponse(Course $course)
-    {
-        $course->loadCount('episodes');
-        return [
-            'id' => $course->id,
-            'name' => $course->name,
-            'description' => $course->description,
-            'image_path' => $course->image_path ? Storage::disk('public')->url($course->image_path) : null,
-            'is_premium' => (bool) $course->is_premium,
-            'category' => $course->category,
-            'episodes_count' => $course->episodes_count,
-            'created_at' => $course->created_at->toDateTimeString(),
-            'updated_at' => $course->updated_at->toDateTimeString(),
-        ];
     }
 
     public function lock($id)
@@ -172,9 +119,13 @@ class CourseController extends Controller
         $course->save();
         $course->episodes()->update(['is_locked' => true]);
         
+        $course->loadCount('episodes');
+
+        Cache::forget('courses_all');
+
         return response()->json([
             'message' => 'Course locked and set to premium.',
-            'data' => $this->transformCourseForResponse($course)
+            'data' => new CourseResource($course)
         ]);
     }
 
@@ -185,10 +136,13 @@ class CourseController extends Controller
         $course->save();
         $course->episodes()->update(['is_locked' => false]);
         
+        $course->loadCount('episodes');
+
+        Cache::forget('courses_all');
+
         return response()->json([
             'message' => 'Course unlocked and set to free.',
-            'data' => $this->transformCourseForResponse($course)
+            'data' => new CourseResource($course)
         ]);
     }
-    // --- FIX END ---
 }

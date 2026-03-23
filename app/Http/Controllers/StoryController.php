@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Story;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Cache;
 use App\Http\Resources\StoryResource; // Import new resource
 
 class StoryController extends Controller
@@ -13,7 +14,9 @@ class StoryController extends Controller
     {
         // FIXED: Eager load relationships AND count to prevent N+1 queries.
         // `withCount` adds a `story_episodes_count` attribute to each story.
-        $stories = Story::with('storyEpisodes')->withCount('storyEpisodes')->get();
+        $stories = Cache::remember('stories_all', 3600, function () {
+            return Story::with('storyEpisodes')->withCount('storyEpisodes')->get();
+        });
         return StoryResource::collection($stories);
     }
 
@@ -33,6 +36,8 @@ class StoryController extends Controller
         }
 
         $story->save();
+
+        Cache::forget('stories_all');
 
         return response()->json([
             'message' => 'Story created successfully.',
@@ -67,6 +72,8 @@ class StoryController extends Controller
 
         $story->save();
 
+        Cache::forget('stories_all');
+
         return response()->json([
             'message' => 'Story updated successfully.',
             'data' => new StoryResource($story)
@@ -79,6 +86,9 @@ class StoryController extends Controller
             Storage::disk('public')->delete($story->image);
         }
         $story->delete();
+        
+        Cache::forget('stories_all');
+        
         return response()->json(['message' => 'Story deleted successfully'], 200);
     }
 
@@ -88,6 +98,8 @@ class StoryController extends Controller
         $story->is_premium = true;
         $story->save();
         $story->storyEpisodes()->update(['is_locked' => true]);
+
+        Cache::forget('stories_all');
 
         return response()->json([
             'message' => 'Story locked and set to premium.',
@@ -101,6 +113,8 @@ class StoryController extends Controller
         $story->is_premium = false;
         $story->save();
         $story->storyEpisodes()->update(['is_locked' => false]);
+
+        Cache::forget('stories_all');
 
         return response()->json([
             'message' => 'Story unlocked and set to free.',

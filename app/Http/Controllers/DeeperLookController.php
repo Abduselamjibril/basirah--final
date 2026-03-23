@@ -5,13 +5,16 @@ namespace App\Http\Controllers;
 use App\Models\DeeperLook;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Cache;
 use App\Http\Resources\DeeperLookResource; // Import new resource
 
 class DeeperLookController extends Controller
 {
     public function index()
     {
-        $deeperLooks = DeeperLook::with('episodes')->get();
+        $deeperLooks = Cache::remember('deeper_looks_all', 3600, function () {
+            return DeeperLook::with('episodes')->get();
+        });
         return DeeperLookResource::collection($deeperLooks);
     }
 
@@ -41,6 +44,8 @@ class DeeperLookController extends Controller
 
         $deeperLook->save();
 
+        Cache::forget('deeper_looks_all');
+
         return response()->json([
             'message' => 'Deeper Look created successfully.',
             'data' => new DeeperLookResource($deeperLook)
@@ -69,6 +74,8 @@ class DeeperLookController extends Controller
 
         $deeperLook->save();
 
+        Cache::forget('deeper_looks_all');
+
         return response()->json([
             'message' => 'Deeper Look updated successfully.',
             'data' => new DeeperLookResource($deeperLook)
@@ -82,6 +89,9 @@ class DeeperLookController extends Controller
             Storage::disk('public')->delete($deeperLook->image);
         }
         $deeperLook->delete();
+        
+        Cache::forget('deeper_looks_all');
+        
         return response()->json(['message' => 'Deeper Look deleted successfully.'], 200);
     }
 
@@ -91,6 +101,8 @@ class DeeperLookController extends Controller
         $deeperLook->is_premium = true;
         $deeperLook->save();
         $deeperLook->episodes()->update(['is_locked' => true]);
+
+        Cache::forget('deeper_looks_all');
 
         return response()->json([
             'message' => 'Deeper Look locked and set to premium.',
@@ -104,6 +116,8 @@ class DeeperLookController extends Controller
         $deeperLook->is_premium = false;
         $deeperLook->save();
         $deeperLook->episodes()->update(['is_locked' => false]);
+
+        Cache::forget('deeper_looks_all');
 
         return response()->json([
             'message' => 'Deeper Look unlocked and set to free.',

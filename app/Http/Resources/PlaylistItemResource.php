@@ -28,18 +28,31 @@ class PlaylistItemResource extends JsonResource
 
         // --- THE FIX IS APPLIED BELOW ---
 
-        // 1. Convert the loaded episode model (e.g., Episode, SurahEpisode) into a plain PHP array.
-        // The `$this->playlistable` holds the actual model object.
-        $episodeData = $this->playlistable->toArray();
+        // Map model classes to their corresponding Resource classes for secure data transformation.
+        $resourceMap = [
+            \App\Models\Episode::class               => EpisodeResource::class,
+            \App\Models\SurahEpisode::class          => SurahEpisodeResource::class,
+            \App\Models\StoryEpisode::class          => StoryEpisodeResource::class,
+            \App\Models\CommentaryEpisode::class     => CommentaryEpisodeResource::class,
+            \App\Models\DeeperLookEpisode::class     => DeeperLookEpisodeResource::class,
+        ];
+
+        // 1. Resolve the appropriate resource for secure data (handling subscription-based nullification).
+        $modelClass = get_class($this->playlistable);
+        $resourceClass = $resourceMap[$modelClass] ?? null;
         
-        // 2. Find the short type key (e.g., 'course') from the full class name. This is correct.
-        $typeKey = array_search(get_class($this->playlistable), PlaylistItem::PLAYLISTABLE_TYPES);
+        // Use the resource to get the secure array, or fallback to raw toArray if not found.
+        $episodeData = $resourceClass 
+            ? (new $resourceClass($this->playlistable))->toArray($request) 
+            : $this->playlistable->toArray();
         
-        // 3. Add the 'type' directly to the PHP array. This is the correct way to do it.
+        // 2. Find the short type key (e.g., 'course') from the full class name.
+        $typeKey = array_search($modelClass, PlaylistItem::PLAYLISTABLE_TYPES);
+        
+        // 3. Add the 'type' directly to the array for the frontend.
         if ($typeKey) {
             $episodeData['type'] = $typeKey;
         } else {
-            // Add a fallback for safety
             $episodeData['type'] = 'unknown';
         }
         

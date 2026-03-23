@@ -47,7 +47,7 @@ class BookmarkController extends Controller
             ->latest() // Order by most recently bookmarked
             ->get();
 
-        return Response::json($bookmarks);
+        return \App\Http\Resources\BookmarkResource::collection($bookmarks);
     }
 
     /**

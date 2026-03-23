@@ -5,9 +5,11 @@ namespace App\Http\Resources;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 use Illuminate\Support\Facades\Storage; // Use Storage facade for consistency
+use App\Http\Traits\ChecksContentAccess;
 
 class CommentaryResource extends JsonResource
 {
+    use ChecksContentAccess;
     /**
      * Transform the resource into an array.
      *
@@ -17,16 +19,10 @@ class CommentaryResource extends JsonResource
     {
         // --- START OF FIX ---
         // Check which guard is active to determine subscription status
-        $hasFullAccess = false;
-        if (auth()->guard('admin')->check()) {
-            // If an admin is logged in, they always have full access.
-            $hasFullAccess = true;
-        } elseif (auth()->guard('sanctum')->check()) {
-            // If a user is logged in, check their subscription.
-            $user = auth()->guard('sanctum')->user();
-            $hasFullAccess = $user ? $user->isSubscribedAndActive() : false;
-        }
+        $hasFullAccess = $this->hasFullAccess();
         // --- END OF FIX ---
+        // Determine if the request is from the React Admin panel
+        $isAdmin = auth()->guard('admin')->check();
 
         return [
             'id' => $this->id,
@@ -34,8 +30,8 @@ class CommentaryResource extends JsonResource
             'description' => $this->description,
             'image' => $this->image ? Storage::disk('public')->url($this->image) : null,
 
-            // Correctly determine the final lock status based on full access
-            'is_premium' => $this->is_premium, // The raw premium status for the admin panel
+            // Admins need to see the REAL database value to toggle it in the React panel.
+            'is_premium' => $isAdmin ? (bool) $this->is_premium : ((bool) $this->is_premium && !$hasFullAccess),
             'is_locked' => $this->is_premium && !$hasFullAccess, // The dynamic status for the user app
 
             'created_at' => $this->created_at->toDateTimeString(),

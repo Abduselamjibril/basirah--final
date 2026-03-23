@@ -108,7 +108,7 @@ class ProgressController extends Controller
                 $episodeProgress->total_duration_seconds = $validated['total_duration_seconds'];
             }
 
-            $completed = $episodeProgress->is_completed;
+            $completed = $episodeProgress->is_completed ?? false;
             if (array_key_exists('is_completed', $validated)) {
                  $completed = $validated['is_completed'];
             }
@@ -216,7 +216,10 @@ class ProgressController extends Controller
                         $completedContent[] = $formattedRecord;
                     }
                 } else {
-                    Log::warning("Content details not found in table '{$tableName}' for {$record->content_type} ID {$record->content_id}.");
+                    // Only log if it's not a known deleted item to avoid spam
+                    if ($record->status !== 'completed') {
+                        Log::warning("Content details not found in table '{$tableName}' for {$record->content_type} ID {$record->content_id}.");
+                    }
                 }
             }
 

@@ -5,13 +5,16 @@ namespace App\Http\Controllers;
 use App\Models\Surah;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Cache;
 use App\Http\Resources\SurahResource; // Import new resource
 
 class SurahController extends Controller
 {
     public function index()
     {
-        $surahs = Surah::with('episodes')->get();
+        $surahs = Cache::remember('surahs_all', 3600, function () {
+            return Surah::with('episodes')->get();
+        });
         // Use the resource to transform the collection
         return SurahResource::collection($surahs);
     }
@@ -47,6 +50,8 @@ class SurahController extends Controller
 
         $surah->save();
 
+        Cache::forget('surahs_all');
+
         return response()->json([
             'message' => 'Surah created successfully.',
             'data' => new SurahResource($surah)
@@ -75,6 +80,8 @@ class SurahController extends Controller
 
         $surah->save();
 
+        Cache::forget('surahs_all');
+
         return response()->json([
             'message' => 'Surah updated successfully.',
             'data' => new SurahResource($surah)
@@ -89,6 +96,9 @@ class SurahController extends Controller
             Storage::disk('public')->delete($surah->image);
         }
         $surah->delete();
+        
+        Cache::forget('surahs_all');
+        
         return response()->json(['message' => 'Surah deleted successfully.'], 200);
     }
 
@@ -98,6 +108,8 @@ class SurahController extends Controller
         $surah->is_premium = true;
         $surah->save();
         $surah->episodes()->update(['is_locked' => true]);
+
+        Cache::forget('surahs_all');
 
         return response()->json([
             'message' => 'Surah locked and set to premium.',
@@ -111,6 +123,8 @@ class SurahController extends Controller
         $surah->is_premium = false;
         $surah->save();
         $surah->episodes()->update(['is_locked' => false]);
+
+        Cache::forget('surahs_all');
 
         return response()->json([
             'message' => 'Surah unlocked and set to free.',

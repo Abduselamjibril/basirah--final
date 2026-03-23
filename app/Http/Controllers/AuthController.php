@@ -23,11 +23,16 @@ class AuthController extends Controller
      */
     public function register(Request $request): JsonResponse
     {
+        // Trim phone number to remove accidental spaces
+        $request->merge([
+            'phone_number' => trim($request->phone_number),
+        ]);
+
         $validator = Validator::make($request->all(), [
             'first_name' => 'required|string|max:255',
             'last_name' => 'required|string|max:255',
             'email' => 'nullable|string|email|max:255|unique:users',
-            'phone_number' => 'required|string|regex:/^[0-9]+$/|unique:users,phone_number',
+            'phone_number' => 'required|string|regex:/^\+?[0-9]{7,15}$/|unique:users,phone_number',
             'password' => 'required|string|min:8|confirmed',
             'device_id' => 'required|string|max:255',
             'device_name' => 'nullable|string|max:255',
@@ -298,7 +303,7 @@ class AuthController extends Controller
                 'nullable', 'string', 'email', 'max:255', Rule::unique('users')->ignore($user->id),
             ],
             'phone_number' => [
-                'required', 'string', 'regex:/^[0-9]+$/', Rule::unique('users')->ignore($user->id),
+                'required', 'string', 'regex:/^\+?[0-9]{7,15}$/', Rule::unique('users')->ignore($user->id),
             ],
         ]);
 

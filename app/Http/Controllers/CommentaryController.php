@@ -5,13 +5,16 @@ namespace App\Http\Controllers;
 use App\Models\Commentary;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Cache;
 use App\Http\Resources\CommentaryResource; // Import new resource
 
 class CommentaryController extends Controller
 {
     public function index()
     {
-        $commentaries = Commentary::with('episodes')->get();
+        $commentaries = Cache::remember('commentaries_all', 3600, function () {
+            return Commentary::with('episodes')->get();
+        });
         return CommentaryResource::collection($commentaries);
     }
 
@@ -40,6 +43,8 @@ class CommentaryController extends Controller
         }
 
         $commentary->save();
+
+        Cache::forget('commentaries_all');
 
         return response()->json([
             'message' => 'Commentary created successfully.',
@@ -70,6 +75,8 @@ class CommentaryController extends Controller
 
         $commentary->save();
 
+        Cache::forget('commentaries_all');
+
         return response()->json([
             'message' => 'Commentary updated successfully.',
             'data' => new CommentaryResource($commentary)
@@ -83,6 +90,9 @@ class CommentaryController extends Controller
             Storage::disk('public')->delete($commentary->image);
         }
         $commentary->delete();
+        
+        Cache::forget('commentaries_all');
+        
         return response()->json(['message' => 'Commentary deleted successfully.'], 200);
     }
 
@@ -92,6 +102,8 @@ class CommentaryController extends Controller
         $commentary->is_premium = true;
         $commentary->save();
         $commentary->episodes()->update(['is_locked' => true]);
+
+        Cache::forget('commentaries_all');
 
         return response()->json([
             'message' => 'Commentary locked and set to premium.',
@@ -105,6 +117,8 @@ class CommentaryController extends Controller
         $commentary->is_premium = false;
         $commentary->save();
         $commentary->episodes()->update(['is_locked' => false]);
+
+        Cache::forget('commentaries_all');
 
         return response()->json([
             'message' => 'Commentary unlocked and set to free.',
