@@ -22,6 +22,9 @@ import '../topbar/subscription_page.dart';
 import '../../providers/bookmark_provider.dart';
 
 class StoryDetailPage extends StatefulWidget {
+  static final Map<int, _StoryDetailCacheEntry> _cache = {};
+  static void clearCache() => _cache.clear();
+
   final Map<String, dynamic> story;
   const StoryDetailPage({required this.story, Key? key}) : super(key: key);
   @override
@@ -38,7 +41,6 @@ class _StoryDetailCacheEntry {
 }
 
 class _StoryDetailPageState extends State<StoryDetailPage> {
-  static final Map<int, _StoryDetailCacheEntry> _cache = {};
   // --- STATE AND SERVICE (No changes needed here) ---
   final BookmarkService _bookmarkService = BookmarkService();
   bool _isUserPremium = false;
@@ -91,7 +93,7 @@ class _StoryDetailPageState extends State<StoryDetailPage> {
   Future<void> _fetchAllInitialData({bool forceRefresh = false}) async {
     if (!mounted) return;
     if (!forceRefresh) {
-      final cached = _cache[_parentId];
+      final cached = StoryDetailPage._cache[_parentId];
       if (cached != null) {
         setState(() {
           _isUserPremium = cached.isUserPremium;
@@ -133,7 +135,7 @@ class _StoryDetailPageState extends State<StoryDetailPage> {
       _logger.i(
           "Successfully fetched initial data. Premium: $_isUserPremium, Episodes: ${_episodes?.length}");
       _contentService.trackContentStart(_contentType, _parentId, token);
-      _cache[_parentId] = _StoryDetailCacheEntry(
+      StoryDetailPage._cache[_parentId] = _StoryDetailCacheEntry(
         isUserPremium: _isUserPremium,
         episodes: _episodes ?? [],
       );
@@ -587,7 +589,7 @@ class _StoryDetailPageState extends State<StoryDetailPage> {
         ),
       ),
       body: RefreshIndicator(
-        onRefresh: _fetchAllInitialData,
+        onRefresh: () => _fetchAllInitialData(forceRefresh: true),
         color: primaryColor,
         backgroundColor: isNightMode ? const Color(0xFF2C2C2C) : Colors.white,
         child: CustomScrollView(

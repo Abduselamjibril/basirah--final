@@ -19,6 +19,9 @@ import '../../theme_provider.dart';
 import '../topbar/subscription_page.dart';
 
 class PlaylistDetailPage extends StatefulWidget {
+  static final Map<int, _PlaylistDetailCacheEntry> _cache = {};
+  static void clearCache() => _cache.clear();
+
   final int playlistId;
   final String playlistName;
 
@@ -42,7 +45,6 @@ class _PlaylistDetailCacheEntry {
 }
 
 class _PlaylistDetailPageState extends State<PlaylistDetailPage> {
-  static final Map<int, _PlaylistDetailCacheEntry> _cache = {};
   Playlist? _playlist;
   bool _isLoading = true;
   String? _errorMessage;
@@ -72,7 +74,7 @@ class _PlaylistDetailPageState extends State<PlaylistDetailPage> {
 
   Future<void> _initialize() async {
     if (!context.mounted) return;
-    final cached = _cache[widget.playlistId];
+    final cached = PlaylistDetailPage._cache[widget.playlistId];
     if (cached != null) {
       setState(() {
         _playlist = cached.playlist;
@@ -98,7 +100,7 @@ class _PlaylistDetailPageState extends State<PlaylistDetailPage> {
       await playlistFuture;
       final playlistSnapshot = _playlist;
       if (playlistSnapshot != null) {
-        _cache[widget.playlistId] = _PlaylistDetailCacheEntry(
+        PlaylistDetailPage._cache[widget.playlistId] = _PlaylistDetailCacheEntry(
           playlist: playlistSnapshot,
           isUserPremium: _isUserPremium,
         );
@@ -127,7 +129,7 @@ class _PlaylistDetailPageState extends State<PlaylistDetailPage> {
       );
       if (!mounted) return;
       setState(() => _playlist = playlist);
-      _cache[widget.playlistId] = _PlaylistDetailCacheEntry(
+      PlaylistDetailPage._cache[widget.playlistId] = _PlaylistDetailCacheEntry(
         playlist: playlist,
         isUserPremium: _isUserPremium,
       );
@@ -153,7 +155,7 @@ class _PlaylistDetailPageState extends State<PlaylistDetailPage> {
     final indexToRemove = _playlist!.items!.indexOf(itemToRemove);
     if (indexToRemove == -1) return;
     setState(() => _playlist!.items!.removeAt(indexToRemove));
-    _cache[widget.playlistId] = _PlaylistDetailCacheEntry(
+    PlaylistDetailPage._cache[widget.playlistId] = _PlaylistDetailCacheEntry(
       playlist: _playlist!,
       isUserPremium: _isUserPremium,
     );
@@ -173,7 +175,7 @@ class _PlaylistDetailPageState extends State<PlaylistDetailPage> {
         return;
       }
       setState(() => _playlist!.items!.insert(indexToRemove, itemToRemove));
-      _cache[widget.playlistId] = _PlaylistDetailCacheEntry(
+      PlaylistDetailPage._cache[widget.playlistId] = _PlaylistDetailCacheEntry(
         playlist: _playlist!,
         isUserPremium: _isUserPremium,
       );

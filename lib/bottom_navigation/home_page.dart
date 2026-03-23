@@ -11,6 +11,7 @@ import '../surah/surah_detail_page.dart';
 import '../story/story_detail_page.dart' as StoryPage;
 import '../deeper_look/deeper_look_detail_page.dart';
 import '../commentary/commentary_detail_page.dart';
+import '../playlist_detail_page.dart';
 import '../providers/auth_provider.dart';
 // --- NEW IMPORT ---
 import '../providers/content_cache_provider.dart';
@@ -60,6 +61,17 @@ class _HomePageState extends State<HomePage> {
         ),
       );
       return;
+    }
+
+    // When force-refreshing, clear all detail page in-memory caches
+    // so stale episode data (e.g. locked status) is not served.
+    if (forceRefresh) {
+      CoursePage.CourseDetailPage.clearCache();
+      SurahDetailPage.clearCache();
+      StoryPage.StoryDetailPage.clearCache();
+      DeeperLookDetailPage.clearCache();
+      CommentaryDetailPage.clearCache();
+      PlaylistDetailPage.clearCache();
     }
 
     // Call the central provider to refresh data for the whole app.

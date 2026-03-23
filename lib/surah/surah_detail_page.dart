@@ -21,6 +21,9 @@ import '../topbar/subscription_page.dart';
 import '../../providers/bookmark_provider.dart';
 
 class SurahDetailPage extends StatefulWidget {
+  static final Map<int, _SurahDetailCacheEntry> _cache = {};
+  static void clearCache() => _cache.clear();
+
   final Map<String, dynamic> surah;
   const SurahDetailPage({required this.surah, Key? key}) : super(key: key);
   @override
@@ -37,7 +40,6 @@ class _SurahDetailCacheEntry {
 }
 
 class _SurahDetailPageState extends State<SurahDetailPage> {
-  static final Map<int, _SurahDetailCacheEntry> _cache = {};
   final BookmarkService _bookmarkService = BookmarkService();
   bool _isUserPremium = false;
   List<dynamic>? _episodes;
@@ -87,7 +89,7 @@ class _SurahDetailPageState extends State<SurahDetailPage> {
   Future<void> _fetchAllInitialData({bool forceRefresh = false}) async {
     if (!mounted) return;
     if (!forceRefresh) {
-      final cached = _cache[_parentId];
+      final cached = SurahDetailPage._cache[_parentId];
       if (cached != null) {
         setState(() {
           _isUserPremium = cached.isUserPremium;
@@ -129,7 +131,7 @@ class _SurahDetailPageState extends State<SurahDetailPage> {
       _logger.i(
           "Successfully fetched initial data. Premium: $_isUserPremium, Episodes: ${_episodes?.length}");
       _contentService.trackContentStart(_contentType, _parentId, token);
-      _cache[_parentId] = _SurahDetailCacheEntry(
+      SurahDetailPage._cache[_parentId] = _SurahDetailCacheEntry(
         isUserPremium: _isUserPremium,
         episodes: _episodes ?? [],
       );
@@ -585,7 +587,7 @@ class _SurahDetailPageState extends State<SurahDetailPage> {
         ),
       ),
       body: RefreshIndicator(
-        onRefresh: _fetchAllInitialData,
+        onRefresh: () => _fetchAllInitialData(forceRefresh: true),
         color: primaryColor,
         backgroundColor: isNightMode ? const Color(0xFF2C2C2C) : Colors.white,
         child: CustomScrollView(

@@ -22,6 +22,9 @@ import '../topbar/subscription_page.dart';
 import '../../providers/bookmark_provider.dart';
 
 class DeeperLookDetailPage extends StatefulWidget {
+  static final Map<int, _DeeperLookDetailCacheEntry> _cache = {};
+  static void clearCache() => _cache.clear();
+
   final Map<String, dynamic> deeperLook;
   const DeeperLookDetailPage({required this.deeperLook, Key? key})
       : super(key: key);
@@ -39,7 +42,6 @@ class _DeeperLookDetailCacheEntry {
 }
 
 class _DeeperLookDetailPageState extends State<DeeperLookDetailPage> {
-  static final Map<int, _DeeperLookDetailCacheEntry> _cache = {};
   // --- STATE AND SERVICE (No changes needed here) ---
   final BookmarkService _bookmarkService = BookmarkService();
   bool _isUserPremium = false;
@@ -92,7 +94,7 @@ class _DeeperLookDetailPageState extends State<DeeperLookDetailPage> {
   Future<void> _fetchAllInitialData({bool forceRefresh = false}) async {
     if (!mounted) return;
     if (!forceRefresh) {
-      final cached = _cache[_parentId];
+      final cached = DeeperLookDetailPage._cache[_parentId];
       if (cached != null) {
         setState(() {
           _isUserPremium = cached.isUserPremium;
@@ -134,7 +136,7 @@ class _DeeperLookDetailPageState extends State<DeeperLookDetailPage> {
       _logger.i(
           "Successfully fetched initial data. Premium: $_isUserPremium, Episodes: ${_episodes?.length}");
       _contentService.trackContentStart(_contentType, _parentId, token);
-      _cache[_parentId] = _DeeperLookDetailCacheEntry(
+      DeeperLookDetailPage._cache[_parentId] = _DeeperLookDetailCacheEntry(
         isUserPremium: _isUserPremium,
         episodes: _episodes ?? [],
       );
@@ -590,7 +592,7 @@ class _DeeperLookDetailPageState extends State<DeeperLookDetailPage> {
         ),
       ),
       body: RefreshIndicator(
-        onRefresh: _fetchAllInitialData,
+        onRefresh: () => _fetchAllInitialData(forceRefresh: true),
         color: primaryColor,
         backgroundColor: isNightMode ? const Color(0xFF2C2C2C) : Colors.white,
         child: CustomScrollView(

@@ -22,6 +22,9 @@ import '../topbar/subscription_page.dart';
 import '../../providers/bookmark_provider.dart';
 
 class CourseDetailPage extends StatefulWidget {
+  static final Map<int, _CourseDetailCacheEntry> _cache = {};
+  static void clearCache() => _cache.clear();
+
   final Map<String, dynamic> course;
   const CourseDetailPage({required this.course, Key? key}) : super(key: key);
   @override
@@ -38,7 +41,6 @@ class _CourseDetailCacheEntry {
 }
 
 class _CourseDetailPageState extends State<CourseDetailPage> {
-  static final Map<int, _CourseDetailCacheEntry> _cache = {};
   final BookmarkService _bookmarkService = BookmarkService();
   bool _isUserPremium = false;
   List<dynamic>? _episodes;
@@ -91,7 +93,7 @@ class _CourseDetailPageState extends State<CourseDetailPage> {
   Future<void> _fetchAllInitialData({bool forceRefresh = false}) async {
     if (!mounted) return;
     if (!forceRefresh) {
-      final cached = _cache[_parentId];
+      final cached = CourseDetailPage._cache[_parentId];
       if (cached != null) {
         setState(() {
           _isUserPremium = cached.isUserPremium;
@@ -133,7 +135,7 @@ class _CourseDetailPageState extends State<CourseDetailPage> {
       _logger.i(
           "Successfully fetched initial data. Premium: $_isUserPremium, Episodes: ${_episodes?.length}");
       _contentService.trackContentStart(_contentType, _parentId, token);
-      _cache[_parentId] = _CourseDetailCacheEntry(
+      CourseDetailPage._cache[_parentId] = _CourseDetailCacheEntry(
         isUserPremium: _isUserPremium,
         episodes: _episodes ?? [],
       );
@@ -611,7 +613,7 @@ class _CourseDetailPageState extends State<CourseDetailPage> {
         ),
       ),
       body: RefreshIndicator(
-        onRefresh: _fetchAllInitialData,
+        onRefresh: () => _fetchAllInitialData(forceRefresh: true),
         color: primaryColor,
         backgroundColor: isNightMode ? const Color(0xFF2C2C2C) : Colors.white,
         child: CustomScrollView(
