@@ -35,7 +35,12 @@ class BookmarkService {
       );
 
       if (response.statusCode == 200) {
-        final data = json.decode(response.body) as List<dynamic>;
+        final decoded = json.decode(response.body);
+        // Handle Laravel API Resource wrapping (it puts data in a 'data' key)
+        final List<dynamic> data = (decoded is Map && decoded.containsKey('data'))
+            ? decoded['data'] as List<dynamic>
+            : decoded as List<dynamic>;
+        
         _logger.d('Successfully fetched ${data.length} total bookmarks.');
         return data;
       } else {

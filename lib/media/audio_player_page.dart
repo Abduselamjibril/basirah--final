@@ -180,7 +180,7 @@ class _AudioPlayerPageState extends State<AudioPlayerPage>
 
   void _startPeriodicProgressUpdates() {
     _progressUpdateTimer?.cancel();
-    _progressUpdateTimer = Timer.periodic(const Duration(seconds: 15), (timer) {
+    _progressUpdateTimer = Timer.periodic(const Duration(seconds: 60), (timer) {
       if (mounted && _audioPlayer.playing && !_isCompleted) {
         _sendProgressUpdate();
       } else if (!mounted || !_audioPlayer.playing) {

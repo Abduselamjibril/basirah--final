@@ -8,6 +8,7 @@ import '../services/bookmark_service.dart'; // Using the new unified service
 import '../services/content_services/data_fetcher.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/content_cache_provider.dart';
+import '../../providers/bookmark_provider.dart';
 
 class SurahPage extends StatefulWidget {
   const SurahPage({super.key});
@@ -17,9 +18,7 @@ class SurahPage extends StatefulWidget {
 
 class _SurahPageState extends State<SurahPage> {
   // --- STATE AND SERVICE REFACTOR ---
-  final BookmarkService _bookmarkService = BookmarkService();
   List<dynamic> surahs = [];
-  Map<int, bool> bookmarks = {};
   String searchQuery = "";
   bool isLoading = true;
   String? lastError;
@@ -68,7 +67,6 @@ class _SurahPageState extends State<SurahPage> {
           isLoading = false;
           lastError = "Please log in to view Surahs.";
           surahs = [];
-          bookmarks = {};
         });
       }
       return;
@@ -82,26 +80,13 @@ class _SurahPageState extends State<SurahPage> {
         token: token,
         forceRefresh: forceRefresh,
       );
-      final bookmarksFuture = _bookmarkService.fetchAllBookmarks(token);
 
       final result = await contentFuture;
-      final allBookmarks = await bookmarksFuture;
-
-      final bookmarkedIds = allBookmarks
-          .where((b) => b['bookmarkable_type'].endsWith('Surah'))
-          // --- FIX --- Changed unsafe cast to robust parsing
-          .map((b) => int.parse(b['bookmarkable_id'].toString()))
-          .toSet();
-
       if (!mounted) return;
+      
       setState(() {
         surahs = result['data'];
         lastError = result['error'];
-        bookmarks = {
-          for (var item in surahs)
-            int.parse(item['id'].toString()):
-                bookmarkedIds.contains(int.parse(item['id'].toString()))
-        };
         isLoading = false;
       });
 
@@ -109,12 +94,12 @@ class _SurahPageState extends State<SurahPage> {
       cacheProvider.setData('surahs', surahs);
       // --- LOGGER ---
       _logger.i(
-          "Successfully fetched ${surahs.length} surahs and ${bookmarks.length} bookmarks.");
+          "Successfully fetched ${surahs.length} surahs.");
 
       if (lastError != null && surahs.isEmpty) {
         _logger.w(
             "Data fetched but with an error from the source: $lastError"); // --- LOGGER ---
-        _showErrorSnackbar(lastError!);
+        if (mounted) _showErrorSnackbar(lastError!);
       }
     } catch (e, stackTrace) {
       // --- LOGGER --- Added stackTrace
@@ -129,34 +114,30 @@ class _SurahPageState extends State<SurahPage> {
   }
 
   Future<void> _toggleBookmark(int surahId) async {
-    _logger.i("Toggling bookmark for surah ID: $surahId"); // --- LOGGER ---
+    _logger.i("Toggling bookmark for surah ID: $surahId");
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final bookmarkProvider =
+        Provider.of<BookmarkProvider>(context, listen: false);
     final token = authProvider.token;
 
     if (token == null) {
-      _logger.w(
-          "Cannot toggle bookmark: User is not logged in."); // --- LOGGER ---
       _showErrorSnackbar("Please log in to manage bookmarks.");
       return;
     }
 
-    final isCurrentlyBookmarked = bookmarks[surahId] ?? false;
-    setState(() => bookmarks[surahId] = !isCurrentlyBookmarked);
-
     try {
-      final message = await _bookmarkService.toggleBookmark(
-          token: token,
-          bookmarkableType: 'surah', // Simple API type string
-          bookmarkableId: surahId);
-      // --- LOGGER ---
-      _logger.i(
-          "Bookmark toggled successfully for surah ID: $surahId. Message: $message");
-      _showSuccessSnackbar(message);
+      await bookmarkProvider.toggleBookmark(
+        token: token,
+        type: 'surah',
+        id: surahId,
+      );
+      if (!mounted) return;
+      _showSuccessSnackbar(bookmarkProvider.isBookmarked('surah', surahId)
+          ? "Bookmark added successfully"
+          : "Bookmark removed successfully");
     } catch (e, stackTrace) {
-      // --- LOGGER --- Added stackTrace
-      _logger.e(
-          "Error toggling bookmark for surah ID: $surahId", e, stackTrace);
-      setState(() => bookmarks[surahId] = isCurrentlyBookmarked);
+      if (!mounted) return;
+      _logger.e("Error toggling bookmark for surah ID: $surahId", e, stackTrace);
       _showErrorSnackbar("Error updating bookmark. Please try again.");
     }
   }
@@ -170,7 +151,7 @@ class _SurahPageState extends State<SurahPage> {
             ? Colors.grey[700]
             : const Color(0xFF009B77),
         behavior: SnackBarBehavior.floating,
-        margin: const EdgeInsets.only(left: 24.0, right: 24.0, bottom: 80.0),
+        margin: const EdgeInsets.only(left: 24.0, right: 24.0, bottom: 20.0),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         duration: const Duration(seconds: 2)));
   }
@@ -181,7 +162,7 @@ class _SurahPageState extends State<SurahPage> {
         content: Text(message),
         backgroundColor: Colors.redAccent.shade700,
         behavior: SnackBarBehavior.floating,
-        margin: const EdgeInsets.only(left: 24.0, right: 24.0, bottom: 80.0),
+        margin: const EdgeInsets.only(left: 24.0, right: 24.0, bottom: 20.0),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         duration: const Duration(seconds: 3)));
   }
@@ -239,53 +220,63 @@ class _SurahPageState extends State<SurahPage> {
             ),
           ),
           Expanded(
-            child: isLoading
-                ? Center(
-                    child: CircularProgressIndicator(
-                        color: isNightMode
-                            ? Colors.white
-                            : const Color(0xFF009B77)))
-                : RefreshIndicator(
-                    onRefresh: () => _fetchData(forceRefresh: true),
-                    color: isNightMode ? Colors.white : const Color(0xFF009B77),
-                    backgroundColor:
-                        isNightMode ? Colors.grey[900] : Colors.white,
-                    child: surahs.isEmpty && lastError != null
-                        ? _buildErrorState(lastError!,
-                            () => _fetchData(forceRefresh: true), isNightMode)
-                        : filteredData.isEmpty
-                            ? _buildEmptyState(
-                                () => _fetchData(forceRefresh: true),
-                                isNightMode,
-                                isSearchActive: searchQuery.isNotEmpty)
-                            : ListView.builder(
-                                padding: const EdgeInsets.only(bottom: 16),
-                                itemCount: filteredData.length,
-                                itemBuilder: (context, index) {
-                                  final surah = filteredData[index];
-                                  final surahId =
-                                      int.parse(surah['id'].toString());
-                                  return _buildSurahItem(
-                                    context,
-                                    surah,
-                                    surahId,
-                                    index,
+            child: Consumer<BookmarkProvider>(
+              builder: (context, bookmarkProvider, child) {
+                return isLoading
+                    ? Center(
+                        child: CircularProgressIndicator(
+                            color: isNightMode
+                                ? Colors.white
+                                : const Color(0xFF009B77)))
+                    : RefreshIndicator(
+                        onRefresh: () => _fetchData(forceRefresh: true),
+                        color: isNightMode ? Colors.white : const Color(0xFF009B77),
+                        backgroundColor:
+                            isNightMode ? Colors.grey[900] : Colors.white,
+                        child: surahs.isEmpty && lastError != null
+                            ? _buildErrorState(lastError!,
+                                () => _fetchData(forceRefresh: true), isNightMode)
+                            : filteredData.isEmpty
+                                ? _buildEmptyState(
+                                    () => _fetchData(forceRefresh: true),
                                     isNightMode,
-                                    isUserPremium,
-                                  );
-                                },
-                              ),
-                  ),
+                                    isSearchActive: searchQuery.isNotEmpty)
+                                : ListView.builder(
+                                    padding: const EdgeInsets.only(bottom: 16),
+                                    itemCount: filteredData.length,
+                                    itemBuilder: (context, index) {
+                                      final surah = filteredData[index];
+                                      final surahId =
+                                          int.parse(surah['id'].toString());
+                                      return _buildSurahItem(
+                                        context,
+                                        surah,
+                                        surahId,
+                                        index,
+                                        isNightMode,
+                                        isUserPremium,
+                                        bookmarkProvider,
+                                      );
+                                    },
+                                  ),
+                      );
+              },
+            ),
           ),
         ],
       ),
     );
   }
 
-  // ... (All build helper methods are unchanged)
-  Widget _buildSurahItem(BuildContext context, dynamic surah, int surahId,
-      int index, bool isNightMode, bool isUserPremium) {
-    final isBookmarked = bookmarks[surahId] ?? false;
+  Widget _buildSurahItem(
+      BuildContext context,
+      dynamic surah,
+      int surahId,
+      int index,
+      bool isNightMode,
+      bool isUserPremium,
+      BookmarkProvider bookmarkProvider) {
+    final isBookmarked = bookmarkProvider.isBookmarked('surah', surahId);
 
     final bool isContentPremium =
         (surah['is_premium'] == true || surah['is_premium'] == 1);

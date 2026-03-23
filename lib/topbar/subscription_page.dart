@@ -332,8 +332,8 @@ class _SubscriptionPageState extends State<SubscriptionPage> {
               onProfileTapped: () {},
               onGiftTapped: () {}, // Added required parameter
               onThemeToggle: themeProvider.toggleTheme,
-              titleLeftPaddingLight: -2.0,
-              titleLeftPaddingDark: -2.0,
+              titleLeftPaddingLight: 0.0,
+              titleLeftPaddingDark: 0.0,
             ),
           ),
           SliverPadding(

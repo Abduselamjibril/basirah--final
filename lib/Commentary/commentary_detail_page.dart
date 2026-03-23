@@ -19,6 +19,7 @@ import '../../services/content_detail_services/ui_service.dart';
 import '../../services/content_detail_services/user_service.dart';
 import '../../theme_provider.dart';
 import '../topbar/subscription_page.dart';
+import '../../providers/bookmark_provider.dart';
 
 class CommentaryDetailPage extends StatefulWidget {
   final Map<String, dynamic> commentary;
@@ -31,11 +32,9 @@ class CommentaryDetailPage extends StatefulWidget {
 class _CommentaryDetailCacheEntry {
   final bool isUserPremium;
   final List<dynamic> episodes;
-  final Map<int, bool> episodeBookmarks;
   const _CommentaryDetailCacheEntry({
     required this.isUserPremium,
     required this.episodes,
-    required this.episodeBookmarks,
   });
 }
 
@@ -45,7 +44,6 @@ class _CommentaryDetailPageState extends State<CommentaryDetailPage> {
   final BookmarkService _bookmarkService = BookmarkService();
   bool _isUserPremium = false;
   List<dynamic>? _episodes;
-  Map<int, bool> _episodeBookmarks = {};
   bool _isLoadingEpisodes = true;
   String? _errorLoadingEpisodes;
   String? _headerImageUrl;
@@ -102,7 +100,6 @@ class _CommentaryDetailPageState extends State<CommentaryDetailPage> {
         setState(() {
           _isUserPremium = cached.isUserPremium;
           _episodes = List<dynamic>.from(cached.episodes);
-          _episodeBookmarks = Map<int, bool>.from(cached.episodeBookmarks);
           _isLoadingEpisodes = false;
           _errorLoadingEpisodes = null;
         });
@@ -133,35 +130,17 @@ class _CommentaryDetailPageState extends State<CommentaryDetailPage> {
       final premiumFuture = _userService.isUserPremium();
       final episodesFuture =
           _contentService.fetchEpisodes(_contentType, _parentId, token);
-      final bookmarksFuture = _bookmarkService.fetchAllBookmarks(token);
-
       _isUserPremium = await premiumFuture;
       _episodes = await episodesFuture;
-      final allBookmarks = await bookmarksFuture;
+      
       if (!mounted) return;
 
-      final bookmarkedEpisodeIds = allBookmarks
-          .where((b) => b['bookmarkable_type'].endsWith('CommentaryEpisode'))
-          .map((b) => int.parse(b['bookmarkable_id'].toString()))
-          .toSet();
-
-      if (mounted && _episodes != null) {
-        setState(() {
-          _episodeBookmarks = {
-            for (var ep in _episodes!)
-              int.parse(ep['id'].toString()):
-                  bookmarkedEpisodeIds.contains(int.parse(ep['id'].toString()))
-          };
-        });
-      }
-
       _logger.i(
-          "Successfully fetched initial data. Premium: $_isUserPremium, Episodes: ${_episodes?.length}, Bookmarks: ${_episodeBookmarks.length}");
+          "Successfully fetched initial data. Premium: $_isUserPremium, Episodes: ${_episodes?.length}");
       _contentService.trackContentStart(_contentType, _parentId, token);
       _cache[_parentId] = _CommentaryDetailCacheEntry(
         isUserPremium: _isUserPremium,
         episodes: _episodes ?? [],
-        episodeBookmarks: Map<int, bool>.from(_episodeBookmarks),
       );
       if (mounted) setState(() => _isLoadingEpisodes = false);
     } catch (e, stackTrace) {
@@ -176,39 +155,32 @@ class _CommentaryDetailPageState extends State<CommentaryDetailPage> {
   }
 
   Future<void> _toggleBookmark(int episodeId) async {
-    _logger.i("Toggling bookmark for commentary episode ID: $episodeId");
     final token = _authProvider.token;
+    final bookmarkProvider =
+        Provider.of<BookmarkProvider>(context, listen: false);
+
     if (token == null) {
-      _logger.w("Cannot toggle bookmark: User is not logged in.");
       _uiService.showErrorSnackbar('Please log in to manage bookmarks.');
       return;
     }
 
-    final bool isCurrentlyBookmarked = _episodeBookmarks[episodeId] ?? false;
-    setState(() => _episodeBookmarks[episodeId] = !isCurrentlyBookmarked);
-    _cache[_parentId] = _CommentaryDetailCacheEntry(
-      isUserPremium: _isUserPremium,
-      episodes: _episodes ?? [],
-      episodeBookmarks: Map<int, bool>.from(_episodeBookmarks),
-    );
-
     try {
-      final message = await _bookmarkService.toggleBookmark(
-          token: token,
-          bookmarkableType: 'commentary_episode',
-          bookmarkableId: episodeId);
-      _logger.i(
-          "Bookmark toggled successfully for commentary episode ID: $episodeId. Message: $message");
-      _uiService.showSuccessSnackbar(message);
-    } catch (e, stackTrace) {
-      _logger.e("Error toggling bookmark for commentary episode ID: $episodeId",
-          e, stackTrace);
-      setState(() => _episodeBookmarks[episodeId] = isCurrentlyBookmarked);
-      _cache[_parentId] = _CommentaryDetailCacheEntry(
-        isUserPremium: _isUserPremium,
-        episodes: _episodes ?? [],
-        episodeBookmarks: Map<int, bool>.from(_episodeBookmarks),
+      await bookmarkProvider.toggleBookmark(
+        token: token,
+        type: 'commentary_episode',
+        id: episodeId,
       );
+      if (!mounted) return;
+      _uiService.showSuccessSnackbar(bookmarkProvider.isBookmarked(
+              'commentary_episode', episodeId)
+          ? "Bookmark added"
+          : "Bookmark removed");
+    } catch (e, stackTrace) {
+      _logger.e(
+          "Error toggling bookmark for commentary episode ID: $episodeId",
+          e,
+          stackTrace);
+      if (!mounted) return;
       _uiService.showErrorSnackbar('Error updating bookmark.');
     }
   }
@@ -671,26 +643,36 @@ class _CommentaryDetailPageState extends State<CommentaryDetailPage> {
                         ),
             ),
             if (!_isLoadingEpisodes && _errorLoadingEpisodes == null)
-              SliverPadding(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-                sliver: _episodes == null || _episodes!.isEmpty
-                    ? SliverToBoxAdapter(
-                        child: _buildEmptyState(isNightMode),
-                      )
-                    : SliverList(
-                        delegate: SliverChildBuilderDelegate(
-                          (context, index) {
-                            final episode = _episodes![index];
-                            final bool locked = _isEpisodeLocked(episode);
-                            return Padding(
-                              padding: const EdgeInsets.only(bottom: 12),
-                              child: _buildEpisodeCard(
-                                  episode, isNightMode, locked),
-                            );
-                          },
-                          childCount: _episodes!.length,
-                        ),
-                      ),
+              Consumer<BookmarkProvider>(
+                builder: (context, bookmarkProvider, child) {
+                  return SliverPadding(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+                    sliver: _episodes == null || _episodes!.isEmpty
+                        ? SliverToBoxAdapter(
+                            child: _buildEmptyState(isNightMode),
+                          )
+                        : SliverList(
+                            delegate: SliverChildBuilderDelegate(
+                              (context, index) {
+                                final episode = _episodes![index];
+                                final bool locked = _isEpisodeLocked(episode);
+                                final int episodeId =
+                                    int.parse(episode['id'].toString());
+                                return Padding(
+                                  padding: const EdgeInsets.only(bottom: 12),
+                                  child: _buildEpisodeCard(
+                                    episode,
+                                    isNightMode,
+                                    locked,
+                                    bookmarkProvider,
+                                  ),
+                                );
+                              },
+                              childCount: _episodes!.length,
+                            ),
+                          ),
+                  );
+                },
               ),
           ],
         ),
@@ -792,7 +774,8 @@ class _CommentaryDetailPageState extends State<CommentaryDetailPage> {
     );
   }
 
-  Widget _buildEpisodeCard(dynamic episode, bool isNightMode, bool locked) {
+  Widget _buildEpisodeCard(dynamic episode, bool isNightMode, bool locked,
+      BookmarkProvider bookmarkProvider) {
     final int episodeId = int.parse(episode['id'].toString());
     return Card(
       elevation: locked ? 0.5 : 1.5,
@@ -811,7 +794,8 @@ class _CommentaryDetailPageState extends State<CommentaryDetailPage> {
             : () => _playFirstAvailableMedia(episode),
         child: locked
             ? _buildLockedEpisodeContent(episode, isNightMode)
-            : _buildUnlockedEpisodeContent(episode, isNightMode, episodeId),
+            : _buildUnlockedEpisodeContent(
+                episode, isNightMode, episodeId, bookmarkProvider),
       ),
     );
   }
@@ -859,9 +843,10 @@ class _CommentaryDetailPageState extends State<CommentaryDetailPage> {
     );
   }
 
-  Widget _buildUnlockedEpisodeContent(
-      dynamic episode, bool isNightMode, int episodeId) {
-    final bool isBookmarked = _episodeBookmarks[episodeId] ?? false;
+  Widget _buildUnlockedEpisodeContent(dynamic episode, bool isNightMode,
+      int episodeId, BookmarkProvider bookmarkProvider) {
+    final bool isBookmarked =
+        bookmarkProvider.isBookmarked('commentary_episode', episodeId);
     final bool hasVideo = _getVideoPath(episode) != null ||
         (episode['youtube_link'] != null &&
             episode['youtube_link'].toString().isNotEmpty);

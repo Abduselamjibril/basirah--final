@@ -37,7 +37,6 @@ class _LoginPageState extends State<LoginPage> {
 
     setState(() => _isLoading = true);
 
-    // Using a local variable for the navigator is safer with async gaps
     final navigator = Navigator.of(context);
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
 
@@ -84,9 +83,6 @@ class _LoginPageState extends State<LoginPage> {
           print("Login successful.");
           fcm.updateAndSendFcmToken();
 
-          // --- THIS IS THE FIX ---
-          // DO NOT show a notification here. Instead, pass the message
-          // to the MainScreen, which will show it safely.
           await navigator.pushReplacement(
             MaterialPageRoute(
               builder: (context) => const MainScreen(
@@ -94,7 +90,6 @@ class _LoginPageState extends State<LoginPage> {
               ),
             ),
           );
-          // -----------------------
         } else {
           _showNotification(
               'Login failed: Invalid server response.', Colors.redAccent);
@@ -123,8 +118,6 @@ class _LoginPageState extends State<LoginPage> {
     }
   }
 
-  // This function is now only used for showing ERRORS, which is safe
-  // because we don't navigate away after an error.
   void _showNotification(String message, Color color) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).removeCurrentSnackBar();
@@ -132,13 +125,13 @@ class _LoginPageState extends State<LoginPage> {
       SnackBar(
         content: Text(message,
             style: const TextStyle(
-                fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+                fontSize: 15, fontWeight: FontWeight.w600, color: Colors.white),
             textAlign: TextAlign.center),
         backgroundColor: color,
         behavior: SnackBarBehavior.floating,
-        margin: const EdgeInsets.fromLTRB(24.0, 0.0, 24.0, 70.0),
+        margin: const EdgeInsets.fromLTRB(24.0, 0.0, 24.0, 20.0),
         shape:
-            RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.0)),
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.0)),
         duration: const Duration(seconds: 4),
       ),
     );
@@ -148,140 +141,200 @@ class _LoginPageState extends State<LoginPage> {
   Widget build(BuildContext context) {
     final themeProvider = Provider.of<ThemeProvider>(context);
     final isDark = themeProvider.isDarkMode;
+    final topPadding = MediaQuery.of(context).padding.top;
 
-    final Color primaryColor =
-        isDark ? const Color(0xFF1E1E1E) : const Color(0xFF009B77);
-    final Color scaffoldBgColor =
-        isDark ? const Color(0xFF002147) : Colors.white;
-    final Color appBarColor = primaryColor;
-    final Color welcomeTextColor = isDark ? Colors.white : Colors.black87;
-    final Color promptTextColor = isDark ? Colors.grey[400]! : Colors.black54;
-    final Color buttonBgColor = primaryColor;
-    final Color buttonFgColor = Colors.white;
+    // ── Unified colour palette ──
+    const Color accentGreen = Color(0xFF009B77);
+    final Color scaffoldBg = isDark ? const Color(0xFF0D1B2A) : const Color(0xFFF7F8FA);
+    final Color cardBg = isDark ? const Color(0xFF1B2838) : Colors.white;
+    final Color headingColor = isDark ? Colors.white : const Color(0xFF1A1A2E);
+    final Color subtitleColor = isDark ? Colors.grey.shade400 : Colors.grey.shade600;
+    final Color linkColor = isDark ? const Color(0xFF4DD0B5) : accentGreen;
+    final Color backBtnBg = isDark ? Colors.white.withOpacity(0.1) : Colors.black.withOpacity(0.05);
+    final Color backBtnIcon = isDark ? Colors.white : const Color(0xFF1A1A2E);
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Login', style: TextStyle(color: Colors.white)),
-        backgroundColor: appBarColor,
-        elevation: 0,
-        iconTheme: const IconThemeData(color: Colors.white),
-      ),
-      backgroundColor: scaffoldBgColor,
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(24.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            Image.asset(
-              isDark ? 'assets/images/logo3.png' : 'assets/images/logo.png',
-              width: 170,
-              height: isDark ? 190 : 170,
+      backgroundColor: scaffoldBg,
+      body: Stack(
+        children: [
+          // ── Main scrollable content ──
+          SingleChildScrollView(
+            padding: EdgeInsets.only(
+              left: 28.0,
+              right: 28.0,
+              top: topPadding + 56,
+              bottom: 32,
             ),
-            const SizedBox(height: 30),
-            Align(
-                alignment: Alignment.centerLeft,
-                child: Text('Welcome Back',
-                    style: TextStyle(
-                        fontSize: 25,
-                        fontWeight: FontWeight.bold,
-                        color: welcomeTextColor))),
-            const SizedBox(height: 8.0),
-            Align(
-                alignment: Alignment.centerLeft,
-                child: Text('Please log in to continue.',
-                    style: TextStyle(fontSize: 13, color: promptTextColor))),
-            const SizedBox(height: 32.0),
-            _buildTextField(
-                controller: _phoneNumberController,
-                label: 'Phone Number',
-                icon: Icons.phone_rounded,
-                inputType: TextInputType.phone,
-                isDark: isDark),
-            const SizedBox(height: 16.0),
-            _buildTextField(
-              controller: _passwordController,
-              label: 'Password',
-              icon: Icons.lock_outline_rounded,
-              isPassword: true,
-              isVisible: _isPasswordVisible,
-              onToggleVisibility: () =>
-                  setState(() => _isPasswordVisible = !_isPasswordVisible),
-              isDark: isDark,
-            ),
-            const SizedBox(height: 32.0),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: _isLoading ? null : _login,
-                style: ElevatedButton.styleFrom(
-                    backgroundColor: buttonBgColor,
-                    padding: const EdgeInsets.symmetric(vertical: 16.0),
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10.0))),
-                child: _isLoading
-                    ? const SizedBox(
-                        height: 24,
-                        width: 24,
-                        child: CircularProgressIndicator(
-                            valueColor:
-                                AlwaysStoppedAnimation<Color>(Colors.white),
-                            strokeWidth: 3))
-                    : Text('Login',
-                        style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: buttonFgColor)),
-              ),
-            ),
-            const SizedBox(height: 16.0),
-            GestureDetector(
-              onTap: () {
-                if (!_isLoading) {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                        builder: (context) => ForgotPasswordPage()),
-                  );
-                }
-              },
-              child: Text(
-                'Forgot Password?',
-                style: TextStyle(
-                  color: Colors.grey[600]!,
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                const SizedBox(height: 12),
+
+                // ── Logo (larger, no top bar) ──
+                Container(
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: accentGreen.withOpacity(isDark ? 0.15 : 0.12),
+                        blurRadius: 40,
+                        spreadRadius: 12,
+                      ),
+                    ],
+                  ),
+                  child: Image.asset(
+                    isDark ? 'assets/images/logo3.png' : 'assets/images/logo.png',
+                    width: 160,
+                    height: 160,
+                  ),
                 ),
-              ),
-            ),
-            const SizedBox(height: 24.0),
-            GestureDetector(
-              onTap: () {
-                if (!_isLoading) {
-                  Navigator.push(context,
-                      MaterialPageRoute(builder: (context) => SignUpPage()));
-                }
-              },
-              child: RichText(
-                text: TextSpan(
-                  text: "Don't have an account? ",
-                  style: TextStyle(color: promptTextColor, fontSize: 16),
-                  children: [
-                    TextSpan(
-                        text: "Register",
-                        style: TextStyle(
-                            color: Colors.grey[600]!,
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold)),
-                  ],
+                const SizedBox(height: 32),
+
+                // ── Heading ──
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text('Welcome Back',
+                      style: TextStyle(
+                          fontSize: 28,
+                          fontWeight: FontWeight.w800,
+                          color: headingColor,
+                          letterSpacing: -0.5)),
                 ),
-              ),
+                const SizedBox(height: 6),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text('Please log in to continue.',
+                      style: TextStyle(fontSize: 14, color: subtitleColor)),
+                ),
+                const SizedBox(height: 28),
+
+                // ── Form Card ──
+                Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: cardBg,
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(isDark ? 0.25 : 0.06),
+                        blurRadius: 16,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    children: [
+                      _buildTextField(
+                          controller: _phoneNumberController,
+                          label: 'Phone Number',
+                          icon: Icons.phone_rounded,
+                          inputType: TextInputType.phone,
+                          isDark: isDark),
+                      const SizedBox(height: 14),
+                      _buildTextField(
+                        controller: _passwordController,
+                        label: 'Password',
+                        icon: Icons.lock_outline_rounded,
+                        isPassword: true,
+                        isVisible: _isPasswordVisible,
+                        onToggleVisibility: () =>
+                            setState(() => _isPasswordVisible = !_isPasswordVisible),
+                        isDark: isDark,
+                      ),
+                      const SizedBox(height: 10),
+
+                      // ── Forgot Password ──
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: GestureDetector(
+                          onTap: () {
+                            if (!_isLoading) {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                    builder: (context) => ForgotPasswordPage()),
+                              );
+                            }
+                          },
+                          child: Text(
+                            'Forgot Password?',
+                            style: TextStyle(
+                              color: linkColor,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 28),
+
+                // ── Login Button ──
+                SizedBox(
+                  width: double.infinity,
+                  height: 52,
+                  child: ElevatedButton(
+                    onPressed: _isLoading ? null : _login,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: isDark ? const Color(0xFF4DD0B5) : accentGreen,
+                      foregroundColor: isDark ? Colors.black : Colors.white,
+                      elevation: 2,
+                      shadowColor: accentGreen.withOpacity(0.3),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12)),
+                    ),
+                    child: _isLoading
+                        ? const SizedBox(
+                            height: 22,
+                            width: 22,
+                            child: CircularProgressIndicator(
+                                valueColor:
+                                    AlwaysStoppedAnimation<Color>(Colors.white),
+                                strokeWidth: 2.5))
+                        : const Text('Login',
+                            style: TextStyle(
+                                fontSize: 17,
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: 0.3)),
+                  ),
+                ),
+                const SizedBox(height: 28),
+
+                // ── Sign Up Link ──
+                GestureDetector(
+                  onTap: () {
+                    if (!_isLoading) {
+                      Navigator.push(context,
+                          MaterialPageRoute(builder: (context) => SignUpPage()));
+                    }
+                  },
+                  child: RichText(
+                    text: TextSpan(
+                      text: "Don't have an account? ",
+                      style: TextStyle(color: subtitleColor, fontSize: 15),
+                      children: [
+                        TextSpan(
+                            text: "Register",
+                            style: TextStyle(
+                                color: linkColor,
+                                fontSize: 15,
+                                fontWeight: FontWeight.w700)),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+              ],
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
 
+  // ── Shared text field builder ──
   Widget _buildTextField({
     required TextEditingController controller,
     required String label,
@@ -292,48 +345,47 @@ class _LoginPageState extends State<LoginPage> {
     TextInputType inputType = TextInputType.text,
     required bool isDark,
   }) {
-    final Color fieldFillColor = isDark ? Colors.grey[850]! : Colors.grey[100]!;
-    final Color fieldBorderColor =
-        isDark ? Colors.grey[700]! : Colors.grey[300]!;
-    final Color fieldFocusedBorderColor = const Color(0xFF009B77);
-    final Color fieldIconColor = const Color(0xFF009B77);
-    final Color fieldLabelTextColor =
-        isDark ? Colors.grey[400]! : Colors.grey[600]!;
+    final Color fieldFillColor = isDark ? const Color(0xFF0D1B2A) : const Color(0xFFF2F4F6);
+    final Color fieldBorderColor = isDark ? Colors.grey.shade700 : Colors.grey.shade300;
+    const Color fieldFocusedBorderColor = Color(0xFF009B77);
+    const Color fieldIconColor = Color(0xFF009B77);
+    final Color fieldLabelTextColor = isDark ? Colors.grey.shade400 : Colors.grey.shade600;
     final Color fieldInputTextColor = isDark ? Colors.white : Colors.black;
-    final Color visibilityIconColor = fieldIconColor.withOpacity(0.7);
 
     return TextField(
       controller: controller,
       obscureText: isPassword && !isVisible,
       keyboardType: inputType,
-      style: TextStyle(color: fieldInputTextColor),
+      style: TextStyle(color: fieldInputTextColor, fontSize: 15),
       decoration: InputDecoration(
         labelText: label,
-        labelStyle: TextStyle(color: fieldLabelTextColor),
-        prefixIcon: Icon(icon, color: fieldIconColor),
+        labelStyle: TextStyle(color: fieldLabelTextColor, fontSize: 14),
+        prefixIcon: Icon(icon, color: fieldIconColor, size: 20),
         filled: true,
         fillColor: fieldFillColor,
         border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(10.0),
+            borderRadius: BorderRadius.circular(12),
             borderSide: BorderSide(color: fieldBorderColor)),
         enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(10.0),
+            borderRadius: BorderRadius.circular(12),
             borderSide: BorderSide(color: fieldBorderColor)),
         focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(10.0),
-            borderSide: BorderSide(color: fieldFocusedBorderColor, width: 1.5)),
+            borderRadius: BorderRadius.circular(12),
+            borderSide:
+                const BorderSide(color: fieldFocusedBorderColor, width: 1.5)),
         suffixIcon: isPassword
             ? IconButton(
                 icon: Icon(
                     isVisible
                         ? Icons.visibility_outlined
                         : Icons.visibility_off_outlined,
-                    color: visibilityIconColor),
+                    color: fieldIconColor.withOpacity(0.6),
+                    size: 20),
                 onPressed: onToggleVisibility,
               )
             : null,
         contentPadding:
-            const EdgeInsets.symmetric(vertical: 15.0, horizontal: 12.0),
+            const EdgeInsets.symmetric(vertical: 14.0, horizontal: 12.0),
       ),
     );
   }

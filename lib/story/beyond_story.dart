@@ -4,13 +4,14 @@ import 'package:provider/provider.dart';
 import 'package:logger/logger.dart'; // --- LOGGER --- Import logger
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
-import 'Story_Detail_Page.dart'; // Corrected filename to match convention
+import 'story_detail_page.dart'; // Corrected filename to snake_case
 import '../../theme_provider.dart';
 // --- NEW IMPORTS ---
 import '../services/bookmark_service.dart'; // Using the new unified service
 import '../services/content_services/data_fetcher.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/content_cache_provider.dart';
+import '../../providers/bookmark_provider.dart';
 
 class StoryNightPage extends StatefulWidget {
   const StoryNightPage({super.key});
@@ -20,10 +21,8 @@ class StoryNightPage extends StatefulWidget {
 
 class _StoryNightPageState extends State<StoryNightPage> {
   // --- STATE AND SERVICE REFACTOR ---
-  final BookmarkService _bookmarkService = BookmarkService();
   List<dynamic> stories = [];
   List<dynamic> filteredStories = [];
-  Map<int, bool> bookmarks = {};
   bool isLoading = true;
   String? errorMessage;
   TextEditingController searchController = TextEditingController();
@@ -90,14 +89,13 @@ class _StoryNightPageState extends State<StoryNightPage> {
     if (token == null) {
       _logger.w(
           "Cannot fetch stories: User is not logged in (token is null)."); // --- LOGGER ---
-      if (mounted) {
-        setState(() {
-          isLoading = false;
-          errorMessage = "Please log in to view stories.";
-          stories = [];
-          bookmarks = {};
-        });
-      }
+        if (mounted) {
+          setState(() {
+            isLoading = false;
+            errorMessage = "Please log in to view stories.";
+            stories = [];
+          });
+        }
       return;
     }
 
@@ -111,26 +109,12 @@ class _StoryNightPageState extends State<StoryNightPage> {
         token: token,
         forceRefresh: forceRefresh,
       );
-      final bookmarksFuture = _bookmarkService.fetchAllBookmarks(token);
-
       final result = await contentFuture;
-      final allBookmarks = await bookmarksFuture;
-
-      final bookmarkedIds = allBookmarks
-          .where((b) => b['bookmarkable_type'].endsWith('Story'))
-          // --- FIX --- Changed unsafe cast to robust parsing
-          .map((b) => int.parse(b['bookmarkable_id'].toString()))
-          .toSet();
-
       if (!mounted) return;
+      
       setState(() {
         stories = result['data'];
         errorMessage = result['error'];
-        bookmarks = {
-          for (var item in stories)
-            int.parse(item['id'].toString()):
-                bookmarkedIds.contains(int.parse(item['id'].toString()))
-        };
         isLoading = false;
         _filterStories();
       });
@@ -139,12 +123,12 @@ class _StoryNightPageState extends State<StoryNightPage> {
       _prefetchImages(stories);
       // --- LOGGER ---
       _logger.i(
-          "Successfully fetched ${stories.length} stories and ${bookmarks.length} story bookmarks.");
+          "Successfully fetched ${stories.length} stories.");
 
       if (errorMessage != null && stories.isEmpty) {
         _logger.w(
             "Data fetched but with an error from the source: $errorMessage"); // --- LOGGER ---
-        _showErrorSnackbar(errorMessage!);
+        if (mounted) _showErrorSnackbar(errorMessage!);
       }
     } catch (e, stackTrace) {
       // --- LOGGER --- Added stackTrace
@@ -159,37 +143,32 @@ class _StoryNightPageState extends State<StoryNightPage> {
   }
 
   Future<void> _toggleStoryBookmark(int storyId) async {
-    _logger.i("Toggling bookmark for story ID: $storyId"); // --- LOGGER ---
+    _logger.i("Toggling bookmark for story ID: $storyId");
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final bookmarkProvider =
+        Provider.of<BookmarkProvider>(context, listen: false);
     final token = authProvider.token;
 
     if (token == null) {
-      _logger.w(
-          "Cannot toggle story bookmark: User is not logged in."); // --- LOGGER ---
       _showErrorSnackbar("Please log in to manage bookmarks.");
       return;
     }
 
-    final isCurrentlyBookmarked = bookmarks[storyId] ?? false;
-    setState(() => bookmarks[storyId] = !isCurrentlyBookmarked);
-
     try {
-      // --- TOGGLE LOGIC REFACTORED ---
-      final message = await _bookmarkService.toggleBookmark(
-          token: token,
-          bookmarkableType: 'story', // Simple API type string
-          bookmarkableId: storyId);
-      // --- LOGGER ---
-      _logger.i(
-          "Bookmark toggled successfully for story ID: $storyId. Message: $message");
-      _showSuccessSnackbar(message);
+      await bookmarkProvider.toggleBookmark(
+        token: token,
+        type: 'story',
+        id: storyId,
+      );
+      if (!mounted) return;
+      _showSuccessSnackbar(bookmarkProvider.isBookmarked('story', storyId)
+          ? "Story bookmarked"
+          : "Bookmark removed");
     } catch (e, stackTrace) {
-      // --- LOGGER --- Added stackTrace
-      // --- LOGGER ---
+      if (!mounted) return;
       _logger.e("Error toggling story bookmark for story ID: $storyId", e,
           stackTrace);
-      setState(() => bookmarks[storyId] = isCurrentlyBookmarked);
-      _showErrorSnackbar("Error updating bookmark. Please try again.");
+      _showErrorSnackbar("Error updating bookmark.");
     }
   }
 
@@ -203,7 +182,7 @@ class _StoryNightPageState extends State<StoryNightPage> {
         backgroundColor:
             isNightMode ? Colors.grey[700] : const Color(0xFF009B77),
         behavior: SnackBarBehavior.floating,
-        margin: const EdgeInsets.only(left: 24.0, right: 24.0, bottom: 80.0),
+        margin: const EdgeInsets.only(left: 24.0, right: 24.0, bottom: 20.0),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         duration: const Duration(seconds: 2)));
   }
@@ -215,7 +194,7 @@ class _StoryNightPageState extends State<StoryNightPage> {
         content: Text(message),
         backgroundColor: Colors.redAccent.shade700,
         behavior: SnackBarBehavior.floating,
-        margin: const EdgeInsets.only(left: 24.0, right: 24.0, bottom: 80.0),
+        margin: const EdgeInsets.only(left: 24.0, right: 24.0, bottom: 20.0),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         duration: const Duration(seconds: 3)));
   }
@@ -279,57 +258,61 @@ class _StoryNightPageState extends State<StoryNightPage> {
             ),
             const SizedBox(height: 16),
             Expanded(
-              child: RefreshIndicator(
-                onRefresh: () => _fetchData(forceRefresh: true),
-                color: isNightMode ? Colors.white : const Color(0xFF009B77),
-                backgroundColor: isNightMode ? Colors.grey[900] : Colors.white,
-                child: isLoading
-                    ? Center(
-                        child: CircularProgressIndicator(
-                            color: isNightMode
-                                ? Colors.white
-                                : const Color(0xFF009B77)))
-                    : errorMessage != null && stories.isEmpty
-                        ? _buildErrorState(
-                            errorMessage!, () => _fetchData(forceRefresh: true))
-                        : filteredStories.isEmpty
-                            ? _buildEmptyState(
-                                isNightMode, searchController.text.isNotEmpty)
-                            : GridView.builder(
-                                gridDelegate:
-                                    const SliverGridDelegateWithFixedCrossAxisCount(
-                                  crossAxisCount: 2,
-                                  crossAxisSpacing: 16.0,
-                                  mainAxisSpacing: 16.0,
-                                  childAspectRatio: 0.75,
-                                ),
-                                itemCount: filteredStories.length,
-                                itemBuilder: (context, index) {
-                                  final story = filteredStories[index];
-                                  final storyId =
-                                      int.parse(story['id'].toString());
-                                  return GestureDetector(
-                                    onTap: () {
-                                      Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                          builder: (context) =>
-                                              StoryDetailPage(story: story),
-                                        ),
-                                      ).then((_) =>
-                                          _fetchData()); // Refresh on return
-                                    },
-                                    child: _buildStoryCard(
-                                      story: story,
-                                      isNightMode: isNightMode,
-                                      isBookmarked: bookmarks[storyId] ?? false,
-                                      onBookmark: () =>
-                                          _toggleStoryBookmark(storyId),
-                                      isUserPremium: isUserPremium,
+              child: Consumer<BookmarkProvider>(
+                builder: (context, bookmarkProvider, child) {
+                  return RefreshIndicator(
+                    onRefresh: () => _fetchData(forceRefresh: true),
+                    color: isNightMode ? Colors.white : const Color(0xFF009B77),
+                    backgroundColor: isNightMode ? Colors.grey[900] : Colors.white,
+                    child: isLoading
+                        ? Center(
+                            child: CircularProgressIndicator(
+                                color: isNightMode
+                                    ? Colors.white
+                                    : const Color(0xFF009B77)))
+                        : errorMessage != null && stories.isEmpty
+                            ? _buildErrorState(errorMessage!,
+                                () => _fetchData(forceRefresh: true))
+                            : filteredStories.isEmpty
+                                ? _buildEmptyState(isNightMode,
+                                    searchController.text.isNotEmpty)
+                                : GridView.builder(
+                                    gridDelegate:
+                                        const SliverGridDelegateWithFixedCrossAxisCount(
+                                      crossAxisCount: 2,
+                                      crossAxisSpacing: 16.0,
+                                      mainAxisSpacing: 16.0,
+                                      childAspectRatio: 0.75,
                                     ),
-                                  );
-                                },
-                              ),
+                                    itemCount: filteredStories.length,
+                                    itemBuilder: (context, index) {
+                                      final story = filteredStories[index];
+                                      final storyId =
+                                          int.parse(story['id'].toString());
+                                      return GestureDetector(
+                                        onTap: () {
+                                          Navigator.push(
+                                            context,
+                                            MaterialPageRoute(
+                                              builder: (context) =>
+                                                  StoryDetailPage(story: story),
+                                            ),
+                                          );
+                                        },
+                                        child: _buildStoryCard(
+                                          story: story,
+                                          isNightMode: isNightMode,
+                                          isBookmarked: bookmarkProvider
+                                              .isBookmarked('story', storyId),
+                                          onBookmark: () =>
+                                              _toggleStoryBookmark(storyId),
+                                          isUserPremium: isUserPremium,
+                                        ),
+                                      );
+                                    },
+                                  ),
+                  );
+                },
               ),
             ),
           ],

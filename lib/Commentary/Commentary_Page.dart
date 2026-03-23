@@ -11,6 +11,7 @@ import '../services/bookmark_service.dart'; // Using the new unified service
 import '../services/content_services/data_fetcher.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/content_cache_provider.dart';
+import '../../providers/bookmark_provider.dart';
 
 class CommentaryPage extends StatefulWidget {
   const CommentaryPage({super.key});
@@ -20,9 +21,7 @@ class CommentaryPage extends StatefulWidget {
 
 class _CommentaryPageState extends State<CommentaryPage> {
   // --- STATE AND SERVICE REFACTOR ---
-  final BookmarkService _bookmarkService = BookmarkService();
   List<dynamic> commentaries = [];
-  Map<int, bool> bookmarks = {};
   String searchQuery = "";
   bool isLoading = true;
   String? lastError;
@@ -69,14 +68,13 @@ class _CommentaryPageState extends State<CommentaryPage> {
     if (token == null) {
       _logger.w(
           "Cannot fetch commentaries: User is not logged in (token is null)."); // --- LOGGER ---
-      if (mounted) {
-        setState(() {
-          isLoading = false;
-          lastError = "Please log in to view commentaries.";
-          commentaries = [];
-          bookmarks = {};
-        });
-      }
+        if (mounted) {
+          setState(() {
+            isLoading = false;
+            lastError = "Please log in to view commentaries.";
+            commentaries = [];
+          });
+        }
       return;
     }
 
@@ -90,26 +88,12 @@ class _CommentaryPageState extends State<CommentaryPage> {
         token: token,
         forceRefresh: forceRefresh,
       );
-      final bookmarksFuture = _bookmarkService.fetchAllBookmarks(token);
-
       final contentResult = await contentFuture;
-      final allBookmarks = await bookmarksFuture;
-
-      final bookmarkedIds = allBookmarks
-          .where((b) => b['bookmarkable_type'].endsWith('Commentary'))
-          // --- FIX --- Changed unsafe cast to robust parsing
-          .map((b) => int.parse(b['bookmarkable_id'].toString()))
-          .toSet();
-
       if (!mounted) return;
+      
       setState(() {
         commentaries = contentResult['data'];
         lastError = contentResult['error'];
-        bookmarks = {
-          for (var item in commentaries)
-            int.parse(item['id'].toString()):
-                bookmarkedIds.contains(int.parse(item['id'].toString()))
-        };
         isLoading = false;
       });
 
@@ -117,12 +101,12 @@ class _CommentaryPageState extends State<CommentaryPage> {
       _prefetchImages(commentaries);
       // --- LOGGER ---
       _logger.i(
-          "Successfully fetched ${commentaries.length} commentaries and ${bookmarks.length} commentary bookmarks.");
+          "Successfully fetched ${commentaries.length} commentaries.");
 
       if (lastError != null && commentaries.isEmpty) {
         _logger.w(
             "Data fetched but with an error from the source: $lastError"); // --- LOGGER ---
-        _showErrorSnackbar(lastError!);
+        if (mounted) _showErrorSnackbar(lastError!);
       }
     } catch (e, stackTrace) {
       // --- LOGGER --- Added stackTrace
@@ -149,25 +133,28 @@ class _CommentaryPageState extends State<CommentaryPage> {
       return;
     }
 
-    final isCurrentlyBookmarked = bookmarks[commentaryId] ?? false;
-    setState(() => bookmarks[commentaryId] = !isCurrentlyBookmarked);
+    final bookmarkProvider =
+        Provider.of<BookmarkProvider>(context, listen: false);
 
     try {
-      // --- TOGGLE LOGIC REFACTORED ---
-      final message = await _bookmarkService.toggleBookmark(
+      await bookmarkProvider.toggleBookmark(
         token: token,
-        bookmarkableType: 'commentary',
-        bookmarkableId: commentaryId,
+        type: 'commentary',
+        id: commentaryId,
       );
+      
+      if (!mounted) return; // Add check after async gap
+      
       _logger.i(
-          "Bookmark toggled successfully for commentary ID: $commentaryId. Message: $message"); // --- LOGGER ---
-      _showSuccessSnackbar(message);
+          "Bookmark toggled successfully for commentary ID: $commentaryId."); // --- LOGGER ---
+      _showSuccessSnackbar(bookmarkProvider.isBookmarked('commentary', commentaryId)
+          ? "Bookmark added successfully"
+          : "Bookmark removed successfully");
     } catch (e, stackTrace) {
-      // --- LOGGER --- Added stackTrace
-      _logger.e("Error updating bookmark for commentary ID: $commentaryId", e,
-          stackTrace); // --- LOGGER ---
-      setState(() => bookmarks[commentaryId] = isCurrentlyBookmarked);
-      _showErrorSnackbar("Error updating bookmark. Please try again.");
+      if (!mounted) return; // Add check after async gap
+      
+      _logger.e("Error toggling bookmark", e, stackTrace);
+      _showErrorSnackbar("Failed to update bookmark. Please try again.");
     }
   }
 
@@ -180,7 +167,7 @@ class _CommentaryPageState extends State<CommentaryPage> {
             ? Colors.grey[700]
             : const Color(0xFF009B77),
         behavior: SnackBarBehavior.floating,
-        margin: const EdgeInsets.only(left: 24.0, right: 24.0, bottom: 80.0),
+        margin: const EdgeInsets.only(left: 24.0, right: 24.0, bottom: 20.0),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         duration: const Duration(seconds: 2)));
   }
@@ -191,7 +178,7 @@ class _CommentaryPageState extends State<CommentaryPage> {
         content: Text(message),
         backgroundColor: Colors.redAccent.shade700,
         behavior: SnackBarBehavior.floating,
-        margin: const EdgeInsets.only(left: 24.0, right: 24.0, bottom: 80.0),
+        margin: const EdgeInsets.only(left: 24.0, right: 24.0, bottom: 20.0),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         duration: const Duration(seconds: 3)));
   }
@@ -266,51 +253,61 @@ class _CommentaryPageState extends State<CommentaryPage> {
             ),
           ),
           Expanded(
-            child: isLoading
-                ? Center(
-                    child: CircularProgressIndicator(
-                        color: isNightMode
-                            ? Colors.white
-                            : const Color(0xFF009B77)))
-                : RefreshIndicator(
-                    onRefresh: () => _fetchData(forceRefresh: true),
-                    color: isNightMode ? Colors.white : const Color(0xFF009B77),
-                    backgroundColor:
-                        isNightMode ? Colors.grey[900] : Colors.white,
-                    child: commentaries.isEmpty && lastError != null
-                        ? _buildErrorState(lastError!,
-                            () => _fetchData(forceRefresh: true), isNightMode)
-                        : filteredData.isEmpty
-                            ? _buildEmptyState(
-                                () => _fetchData(forceRefresh: true),
-                                isNightMode,
-                                isSearchActive: searchQuery.isNotEmpty)
-                            : ListView.builder(
-                                padding: const EdgeInsets.only(bottom: 16),
-                                itemCount: filteredData.length,
-                                itemBuilder: (context, index) {
-                                  final commentary = filteredData[index];
-                                  final commentaryId =
-                                      int.parse(commentary['id'].toString());
-                                  return _buildCommentaryItem(
-                                    context,
-                                    commentary,
-                                    commentaryId,
+            child: Consumer<BookmarkProvider>(
+              builder: (context, bookmarkProvider, child) {
+                return isLoading
+                    ? Center(
+                        child: CircularProgressIndicator(
+                            color: isNightMode
+                                ? Colors.white
+                                : const Color(0xFF009B77)))
+                    : RefreshIndicator(
+                        onRefresh: () => _fetchData(forceRefresh: true),
+                        color: isNightMode ? Colors.white : const Color(0xFF009B77),
+                        backgroundColor:
+                            isNightMode ? Colors.grey[900] : Colors.white,
+                        child: commentaries.isEmpty && lastError != null
+                            ? _buildErrorState(lastError!,
+                                () => _fetchData(forceRefresh: true), isNightMode)
+                            : filteredData.isEmpty
+                                ? _buildEmptyState(
+                                    () => _fetchData(forceRefresh: true),
                                     isNightMode,
-                                    isUserPremium,
-                                  );
-                                },
-                              ),
-                  ),
+                                    isSearchActive: searchQuery.isNotEmpty)
+                                : ListView.builder(
+                                    padding: const EdgeInsets.only(bottom: 16),
+                                    itemCount: filteredData.length,
+                                    itemBuilder: (context, index) {
+                                      final commentary = filteredData[index];
+                                      final commentaryId =
+                                          int.parse(commentary['id'].toString());
+                                      return _buildCommentaryItem(
+                                        context,
+                                        commentary,
+                                        commentaryId,
+                                        isNightMode,
+                                        isUserPremium,
+                                        bookmarkProvider,
+                                      );
+                                    },
+                                  ),
+                      );
+              },
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildCommentaryItem(BuildContext context, dynamic commentary,
-      int commentaryId, bool isNightMode, bool isUserPremium) {
-    final isBookmarked = bookmarks[commentaryId] ?? false;
+  Widget _buildCommentaryItem(
+      BuildContext context,
+      dynamic commentary,
+      int commentaryId,
+      bool isNightMode,
+      bool isUserPremium,
+      BookmarkProvider bookmarkProvider) {
+    final isBookmarked = bookmarkProvider.isBookmarked('commentary', commentaryId);
     final bool isContentPremium =
         (commentary['is_premium'] == true || commentary['is_premium'] == 1);
     final bool showPremiumIcon = isContentPremium && !isUserPremium;
@@ -343,8 +340,7 @@ class _CommentaryPageState extends State<CommentaryPage> {
                     context,
                     MaterialPageRoute(
                         builder: (context) =>
-                            CommentaryDetailPage(commentary: commentary)))
-                .then((_) => _fetchData());
+                            CommentaryDetailPage(commentary: commentary)));
           },
           child: ListTile(
             contentPadding:

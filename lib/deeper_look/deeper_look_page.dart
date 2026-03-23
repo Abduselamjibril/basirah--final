@@ -11,6 +11,7 @@ import '../services/bookmark_service.dart'; // Using the new unified service
 import '../services/content_services/data_fetcher.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/content_cache_provider.dart';
+import '../../providers/bookmark_provider.dart';
 
 class DeeperLookPage extends StatefulWidget {
   const DeeperLookPage({super.key});
@@ -20,9 +21,7 @@ class DeeperLookPage extends StatefulWidget {
 
 class _DeeperLookPageState extends State<DeeperLookPage> {
   // --- STATE AND SERVICE REFACTOR ---
-  final BookmarkService _bookmarkService = BookmarkService();
   List<dynamic> deeperLooks = [];
-  Map<int, bool> bookmarks = {};
   String searchQuery = "";
   bool isLoading = true;
   String? lastError;
@@ -69,14 +68,13 @@ class _DeeperLookPageState extends State<DeeperLookPage> {
     if (token == null) {
       _logger.w(
           "Cannot fetch deeper looks: User is not logged in (token is null)."); // --- LOGGER ---
-      if (mounted) {
-        setState(() {
-          isLoading = false;
-          lastError = "Please log in to view this content.";
-          deeperLooks = [];
-          bookmarks = {};
-        });
-      }
+        if (mounted) {
+          setState(() {
+            isLoading = false;
+            lastError = "Please log in to view this content.";
+            deeperLooks = [];
+          });
+        }
       return;
     }
 
@@ -90,26 +88,12 @@ class _DeeperLookPageState extends State<DeeperLookPage> {
         token: token,
         forceRefresh: forceRefresh,
       );
-      final bookmarksFuture = _bookmarkService.fetchAllBookmarks(token);
-
       final result = await contentFuture;
-      final allBookmarks = await bookmarksFuture;
-
-      final bookmarkedIds = allBookmarks
-          .where((b) => b['bookmarkable_type'].endsWith('DeeperLook'))
-          // --- FIX --- Changed unsafe cast to robust parsing
-          .map((b) => int.parse(b['bookmarkable_id'].toString()))
-          .toSet();
-
       if (!mounted) return;
+      
       setState(() {
         deeperLooks = result['data'];
         lastError = result['error'];
-        bookmarks = {
-          for (var item in deeperLooks)
-            int.parse(item['id'].toString()):
-                bookmarkedIds.contains(int.parse(item['id'].toString()))
-        };
         isLoading = false;
       });
 
@@ -117,12 +101,12 @@ class _DeeperLookPageState extends State<DeeperLookPage> {
       _prefetchImages(deeperLooks);
       // --- LOGGER ---
       _logger.i(
-          "Successfully fetched ${deeperLooks.length} deeper looks and ${bookmarks.length} bookmarks.");
+          "Successfully fetched ${deeperLooks.length} deeper looks.");
 
       if (lastError != null && deeperLooks.isEmpty) {
         _logger.w(
             "Data fetched but with an error from the source: $lastError"); // --- LOGGER ---
-        _showErrorSnackbar(lastError!);
+        if (mounted) _showErrorSnackbar(lastError!);
       }
     } catch (e, stackTrace) {
       // --- LOGGER --- Added stackTrace
@@ -149,25 +133,34 @@ class _DeeperLookPageState extends State<DeeperLookPage> {
       return;
     }
 
-    final isCurrentlyBookmarked = bookmarks[deeperLookId] ?? false;
-    setState(() => bookmarks[deeperLookId] = !isCurrentlyBookmarked);
+    final bookmarkProvider =
+        Provider.of<BookmarkProvider>(context, listen: false);
 
     try {
-      // --- TOGGLE LOGIC REFACTORED ---
-      final message = await _bookmarkService.toggleBookmark(
-          token: token,
-          bookmarkableType: 'deeper_look', // Simple API type string
-          bookmarkableId: deeperLookId);
+      await bookmarkProvider.toggleBookmark(
+        token: token,
+        type: 'deeper_look',
+        id: deeperLookId,
+      );
+      
+      if (!mounted) return; // Add check after async gap
+      
+      // --- LOGGER ---
+      
+      if (!mounted) return; // Add check after async gap
+      
       // --- LOGGER ---
       _logger.i(
-          "Bookmark toggled successfully for Deeper Look ID: $deeperLookId. Message: $message");
-      _showSuccessSnackbar(message);
+          "Bookmark toggled successfully for Deeper Look ID: $deeperLookId.");
+      _showSuccessSnackbar(bookmarkProvider.isBookmarked('deeper_look', deeperLookId)
+          ? "Bookmark added successfully"
+          : "Bookmark removed successfully");
     } catch (e, stackTrace) {
+      if (!mounted) return; // Add check after async gap
+      
       // --- LOGGER --- Added stackTrace
-      // --- LOGGER ---
       _logger.e("Error toggling bookmark for Deeper Look ID: $deeperLookId", e,
           stackTrace);
-      setState(() => bookmarks[deeperLookId] = isCurrentlyBookmarked);
       _showErrorSnackbar("Error updating bookmark. Please try again.");
     }
   }
@@ -181,7 +174,7 @@ class _DeeperLookPageState extends State<DeeperLookPage> {
             ? Colors.grey[700]
             : const Color(0xFF009B77),
         behavior: SnackBarBehavior.floating,
-        margin: const EdgeInsets.only(left: 24.0, right: 24.0, bottom: 80.0),
+        margin: const EdgeInsets.only(left: 24.0, right: 24.0, bottom: 20.0),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         duration: const Duration(seconds: 2)));
   }
@@ -192,7 +185,7 @@ class _DeeperLookPageState extends State<DeeperLookPage> {
         content: Text(message),
         backgroundColor: Colors.redAccent.shade700,
         behavior: SnackBarBehavior.floating,
-        margin: const EdgeInsets.only(left: 24.0, right: 24.0, bottom: 80.0),
+        margin: const EdgeInsets.only(left: 24.0, right: 24.0, bottom: 20.0),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         duration: const Duration(seconds: 3)));
   }
@@ -266,51 +259,61 @@ class _DeeperLookPageState extends State<DeeperLookPage> {
             ),
           ),
           Expanded(
-            child: isLoading
-                ? Center(
-                    child: CircularProgressIndicator(
-                        color: isNightMode
-                            ? Colors.white
-                            : const Color(0xFF009B77)))
-                : RefreshIndicator(
-                    onRefresh: () => _fetchData(forceRefresh: true),
-                    color: isNightMode ? Colors.white : const Color(0xFF009B77),
-                    backgroundColor:
-                        isNightMode ? Colors.grey[900] : Colors.white,
-                    child: deeperLooks.isEmpty && lastError != null
-                        ? _buildErrorState(lastError!,
-                            () => _fetchData(forceRefresh: true), isNightMode)
-                        : filteredData.isEmpty
-                            ? _buildEmptyState(
-                                () => _fetchData(forceRefresh: true),
-                                isNightMode,
-                                isSearchActive: searchQuery.isNotEmpty)
-                            : ListView.builder(
-                                padding: const EdgeInsets.only(bottom: 16),
-                                itemCount: filteredData.length,
-                                itemBuilder: (context, index) {
-                                  final deeperLook = filteredData[index];
-                                  final deeperLookId =
-                                      int.parse(deeperLook['id'].toString());
-                                  return _buildDeeperLookItem(
-                                    context,
-                                    deeperLook,
-                                    deeperLookId,
+            child: Consumer<BookmarkProvider>(
+              builder: (context, bookmarkProvider, child) {
+                return isLoading
+                    ? Center(
+                        child: CircularProgressIndicator(
+                            color: isNightMode
+                                ? Colors.white
+                                : const Color(0xFF009B77)))
+                    : RefreshIndicator(
+                        onRefresh: () => _fetchData(forceRefresh: true),
+                        color: isNightMode ? Colors.white : const Color(0xFF009B77),
+                        backgroundColor:
+                            isNightMode ? Colors.grey[900] : Colors.white,
+                        child: deeperLooks.isEmpty && lastError != null
+                            ? _buildErrorState(lastError!,
+                                () => _fetchData(forceRefresh: true), isNightMode)
+                            : filteredData.isEmpty
+                                ? _buildEmptyState(
+                                    () => _fetchData(forceRefresh: true),
                                     isNightMode,
-                                    isUserPremium,
-                                  );
-                                },
-                              ),
-                  ),
+                                    isSearchActive: searchQuery.isNotEmpty)
+                                : ListView.builder(
+                                    padding: const EdgeInsets.only(bottom: 16),
+                                    itemCount: filteredData.length,
+                                    itemBuilder: (context, index) {
+                                      final deeperLook = filteredData[index];
+                                      final deeperLookId =
+                                          int.parse(deeperLook['id'].toString());
+                                      return _buildDeeperLookItem(
+                                        context,
+                                        deeperLook,
+                                        deeperLookId,
+                                        isNightMode,
+                                        isUserPremium,
+                                        bookmarkProvider,
+                                      );
+                                    },
+                                  ),
+                      );
+              },
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildDeeperLookItem(BuildContext context, dynamic deeperLook,
-      int deeperLookId, bool isNightMode, bool isUserPremium) {
-    final isBookmarked = bookmarks[deeperLookId] ?? false;
+  Widget _buildDeeperLookItem(
+      BuildContext context,
+      dynamic deeperLook,
+      int deeperLookId,
+      bool isNightMode,
+      bool isUserPremium,
+      BookmarkProvider bookmarkProvider) {
+    final isBookmarked = bookmarkProvider.isBookmarked('deeper_look', deeperLookId);
     final bool isContentPremium =
         (deeperLook['is_premium'] == true || deeperLook['is_premium'] == 1);
     final bool showPremiumIcon = isContentPremium && !isUserPremium;
@@ -341,8 +344,7 @@ class _DeeperLookPageState extends State<DeeperLookPage> {
                     context,
                     MaterialPageRoute(
                         builder: (context) =>
-                            DeeperLookDetailPage(deeperLook: deeperLook)))
-                .then((_) => _fetchData());
+                            DeeperLookDetailPage(deeperLook: deeperLook)));
           },
           child: ListTile(
             contentPadding:

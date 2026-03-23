@@ -19,6 +19,7 @@ import '../../services/content_detail_services/ui_service.dart';
 import '../../services/content_detail_services/user_service.dart';
 import '../../theme_provider.dart';
 import '../topbar/subscription_page.dart';
+import '../../providers/bookmark_provider.dart';
 
 class CourseDetailPage extends StatefulWidget {
   final Map<String, dynamic> course;
@@ -30,11 +31,9 @@ class CourseDetailPage extends StatefulWidget {
 class _CourseDetailCacheEntry {
   final bool isUserPremium;
   final List<dynamic> episodes;
-  final Map<int, bool> episodeBookmarks;
   const _CourseDetailCacheEntry({
     required this.isUserPremium,
     required this.episodes,
-    required this.episodeBookmarks,
   });
 }
 
@@ -43,7 +42,6 @@ class _CourseDetailPageState extends State<CourseDetailPage> {
   final BookmarkService _bookmarkService = BookmarkService();
   bool _isUserPremium = false;
   List<dynamic>? _episodes;
-  Map<int, bool> _episodeBookmarks = {};
   bool _isLoadingEpisodes = true;
   String? _errorLoadingEpisodes;
   String? _headerImageUrl;
@@ -98,7 +96,6 @@ class _CourseDetailPageState extends State<CourseDetailPage> {
         setState(() {
           _isUserPremium = cached.isUserPremium;
           _episodes = List<dynamic>.from(cached.episodes);
-          _episodeBookmarks = Map<int, bool>.from(cached.episodeBookmarks);
           _isLoadingEpisodes = false;
           _errorLoadingEpisodes = null;
         });
@@ -129,34 +126,16 @@ class _CourseDetailPageState extends State<CourseDetailPage> {
       final premiumFuture = _userService.isUserPremium();
       final episodesFuture =
           _contentService.fetchEpisodes(_contentType, _parentId, token);
-      final bookmarksFuture = _bookmarkService.fetchAllBookmarks(token);
-
       _isUserPremium = await premiumFuture;
       _episodes = await episodesFuture;
-      final allBookmarks = await bookmarksFuture;
+      
       if (!mounted) return;
-
-      final bookmarkedEpisodeIds = allBookmarks
-          .where((b) => b['bookmarkable_type'].endsWith('Episode'))
-          .map((b) => int.parse(b['bookmarkable_id'].toString()))
-          .toSet();
-
-      if (mounted && _episodes != null) {
-        setState(() {
-          _episodeBookmarks = {
-            for (var ep in _episodes!)
-              int.parse(ep['id'].toString()):
-                  bookmarkedEpisodeIds.contains(int.parse(ep['id'].toString()))
-          };
-        });
-      }
       _logger.i(
-          "Successfully fetched initial data. Premium: $_isUserPremium, Episodes: ${_episodes?.length}, Bookmarks: ${_episodeBookmarks.length}");
+          "Successfully fetched initial data. Premium: $_isUserPremium, Episodes: ${_episodes?.length}");
       _contentService.trackContentStart(_contentType, _parentId, token);
       _cache[_parentId] = _CourseDetailCacheEntry(
         isUserPremium: _isUserPremium,
         episodes: _episodes ?? [],
-        episodeBookmarks: Map<int, bool>.from(_episodeBookmarks),
       );
       if (mounted) setState(() => _isLoadingEpisodes = false);
     } catch (e, stackTrace) {
@@ -172,6 +151,9 @@ class _CourseDetailPageState extends State<CourseDetailPage> {
 
   Future<void> _toggleBookmark(int episodeId) async {
     final token = _authProvider.token;
+    final bookmarkProvider =
+        Provider.of<BookmarkProvider>(context, listen: false);
+    
     if (token == null) {
       if (mounted) {
         _uiService.showErrorSnackbar('Please log in to manage bookmarks.');
@@ -179,31 +161,19 @@ class _CourseDetailPageState extends State<CourseDetailPage> {
       return;
     }
 
-    final bool isCurrentlyBookmarked = _episodeBookmarks[episodeId] ?? false;
-    setState(() => _episodeBookmarks[episodeId] = !isCurrentlyBookmarked);
-    _cache[_parentId] = _CourseDetailCacheEntry(
-      isUserPremium: _isUserPremium,
-      episodes: _episodes ?? [],
-      episodeBookmarks: Map<int, bool>.from(_episodeBookmarks),
-    );
-
     try {
-      final message = await _bookmarkService.toggleBookmark(
-          token: token, bookmarkableType: 'episode', bookmarkableId: episodeId);
-
+      await bookmarkProvider.toggleBookmark(
+        token: token,
+        type: 'episode',
+        id: episodeId,
+      );
       if (!mounted) return;
-      _uiService.showSuccessSnackbar(message);
+      _uiService.showSuccessSnackbar(bookmarkProvider.isBookmarked('episode', episodeId)
+          ? "Bookmark added"
+          : "Bookmark removed");
     } catch (e, stackTrace) {
       _logger.e("Error toggling bookmark for course episode ID: $episodeId", e,
           stackTrace);
-      setState(() => _episodeBookmarks[episodeId] = isCurrentlyBookmarked);
-
-      _cache[_parentId] = _CourseDetailCacheEntry(
-        isUserPremium: _isUserPremium,
-        episodes: _episodes ?? [],
-        episodeBookmarks: Map<int, bool>.from(_episodeBookmarks),
-      );
-
       if (!mounted) return;
       _uiService.showErrorSnackbar('Error updating bookmark.');
     }
@@ -338,14 +308,13 @@ class _CourseDetailPageState extends State<CourseDetailPage> {
                                   Navigator.pop(dialogContext);
                                 }
 
-                                if (mounted) {
-                                  if (success) {
-                                    _uiService.showSuccessSnackbar(
-                                        'Item added to playlist.');
-                                  } else {
-                                    _uiService.showErrorSnackbar(
-                                        'Failed to add. Please try again.');
-                                  }
+                                if (!mounted) return;
+                                if (success) {
+                                  _uiService.showSuccessSnackbar(
+                                      'Item added to playlist.');
+                                } else {
+                                  _uiService.showErrorSnackbar(
+                                      'Failed to add. Please try again.');
                                 }
                               },
                             );
@@ -415,13 +384,12 @@ class _CourseDetailPageState extends State<CourseDetailPage> {
                   Navigator.pop(dialogContext);
                 }
 
-                if (mounted) {
-                  if (success) {
-                    _uiService.showSuccessSnackbar(
-                        'Playlist created and episode added.');
-                  } else {
-                    _uiService.showErrorSnackbar('Error creating playlist.');
-                  }
+                if (!mounted) return;
+                if (success) {
+                  _uiService.showSuccessSnackbar(
+                      'Playlist created and episode added.');
+                } else {
+                  _uiService.showErrorSnackbar('Error creating playlist.');
                 }
               },
               style: ElevatedButton.styleFrom(
@@ -679,26 +647,36 @@ class _CourseDetailPageState extends State<CourseDetailPage> {
                         ),
             ),
             if (!_isLoadingEpisodes && _errorLoadingEpisodes == null)
-              SliverPadding(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-                sliver: _episodes == null || _episodes!.isEmpty
-                    ? SliverToBoxAdapter(
-                        child: _buildEmptyState(isNightMode),
-                      )
-                    : SliverList(
-                        delegate: SliverChildBuilderDelegate(
-                          (context, index) {
-                            final episode = _episodes![index];
-                            final bool locked = _isEpisodeLocked(episode);
-                            return Padding(
-                              padding: const EdgeInsets.only(bottom: 12),
-                              child: _buildEpisodeCard(
-                                  episode, isNightMode, locked),
-                            );
-                          },
-                          childCount: _episodes!.length,
-                        ),
-                      ),
+              Consumer<BookmarkProvider>(
+                builder: (context, bookmarkProvider, child) {
+                  return SliverPadding(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+                    sliver: _episodes == null || _episodes!.isEmpty
+                        ? SliverToBoxAdapter(
+                            child: _buildEmptyState(isNightMode),
+                          )
+                        : SliverList(
+                            delegate: SliverChildBuilderDelegate(
+                              (context, index) {
+                                final episode = _episodes![index];
+                                final bool locked = _isEpisodeLocked(episode);
+                                final int episodeId =
+                                    int.parse(episode['id'].toString());
+                                return Padding(
+                                  padding: const EdgeInsets.only(bottom: 12),
+                                  child: _buildEpisodeCard(
+                                    episode,
+                                    isNightMode,
+                                    locked,
+                                    bookmarkProvider,
+                                  ),
+                                );
+                              },
+                              childCount: _episodes!.length,
+                            ),
+                          ),
+                  );
+                },
               ),
           ],
         ),
@@ -799,7 +777,8 @@ class _CourseDetailPageState extends State<CourseDetailPage> {
     );
   }
 
-  Widget _buildEpisodeCard(dynamic episode, bool isNightMode, bool locked) {
+  Widget _buildEpisodeCard(dynamic episode, bool isNightMode, bool locked,
+      BookmarkProvider bookmarkProvider) {
     final int episodeId = int.parse(episode['id'].toString());
     return Card(
       elevation: locked ? 0.5 : 1.5,
@@ -818,7 +797,8 @@ class _CourseDetailPageState extends State<CourseDetailPage> {
             : () => _playFirstAvailableMedia(episode),
         child: locked
             ? _buildLockedEpisodeContent(episode, isNightMode)
-            : _buildUnlockedEpisodeContent(episode, isNightMode, episodeId),
+            : _buildUnlockedEpisodeContent(
+                episode, isNightMode, episodeId, bookmarkProvider),
       ),
     );
   }
@@ -866,9 +846,10 @@ class _CourseDetailPageState extends State<CourseDetailPage> {
     );
   }
 
-  Widget _buildUnlockedEpisodeContent(
-      dynamic episode, bool isNightMode, int episodeId) {
-    final bool isBookmarked = _episodeBookmarks[episodeId] ?? false;
+  Widget _buildUnlockedEpisodeContent(dynamic episode, bool isNightMode,
+      int episodeId, BookmarkProvider bookmarkProvider) {
+    final bool isBookmarked =
+        bookmarkProvider.isBookmarked('episode', episodeId);
     final bool hasVideo = _getVideoPath(episode) != null ||
         (episode['youtube_link'] != null &&
             episode['youtube_link'].toString().isNotEmpty);

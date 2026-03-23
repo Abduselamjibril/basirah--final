@@ -125,15 +125,14 @@ class _PlaylistDetailPageState extends State<PlaylistDetailPage> {
         playlistId: widget.playlistId,
         token: token,
       );
-      if (context.mounted) {
-        setState(() => _playlist = playlist);
-        _cache[widget.playlistId] = _PlaylistDetailCacheEntry(
-          playlist: playlist,
-          isUserPremium: _isUserPremium,
-        );
-      }
+      if (!mounted) return;
+      setState(() => _playlist = playlist);
+      _cache[widget.playlistId] = _PlaylistDetailCacheEntry(
+        playlist: playlist,
+        isUserPremium: _isUserPremium,
+      );
     } catch (e) {
-      if (!context.mounted) return;
+      if (!mounted) return;
       final statusCode = _getStatusCodeFromException(e);
       if (statusCode == 403 || statusCode == 404) {
         _uiService.showErrorSnackbar('This playlist is no longer available.');
@@ -164,9 +163,10 @@ class _PlaylistDetailPageState extends State<PlaylistDetailPage> {
         playlistItemId: itemToRemove.itemId,
         token: token,
       );
+      if (!mounted) return;
       _uiService.showSuccessSnackbar('Episode removed from playlist.');
     } catch (e) {
-      if (!context.mounted) return;
+      if (!mounted) return;
       final statusCode = _getStatusCodeFromException(e);
       if (statusCode == 403 || statusCode == 404) {
         _uiService.showSuccessSnackbar('Item was already removed.');

@@ -13,7 +13,7 @@ import '../course/course_detail_page.dart';
 import '../surah/surah_detail_page.dart';
 import '../story/story_detail_page.dart';
 import '../deeper_look/deeper_look_detail_page.dart';
-import '../Commentary/commentary_detail_page.dart';
+import '../commentary/commentary_detail_page.dart';
 
 // Import Theme Provider
 import '../theme_provider.dart';
@@ -324,8 +324,7 @@ class _MyLearningPageState extends State<MyLearningPage> {
     final themeProvider = Provider.of<ThemeProvider>(context);
     final isNightMode = themeProvider.isDarkMode;
     final primaryColor = Color(0xFF009B77);
-    final scaffoldBackgroundColor =
-        isNightMode ? Color(0xFF002147) : Colors.grey[50];
+    final Color backgroundColor = themeProvider.currentTheme.scaffoldBackgroundColor;
     final cardBackgroundColor = isNightMode ? Color(0xFF1E1E1E) : Colors.white;
     final textColor = isNightMode ? Colors.white : Colors.black87;
     final subTextColor = isNightMode ? Colors.white70 : Colors.grey[600];
@@ -337,7 +336,7 @@ class _MyLearningPageState extends State<MyLearningPage> {
     return DefaultTabController(
       length: 2,
       child: Scaffold(
-        backgroundColor: scaffoldBackgroundColor,
+        backgroundColor: backgroundColor,
         appBar: AppBar(
           title: Text('My Learning',
               style: TextStyle(fontWeight: FontWeight.bold)),
@@ -641,7 +640,7 @@ class _MyLearningPageState extends State<MyLearningPage> {
               content: Text('Cannot open invalid content.'),
               behavior: SnackBarBehavior.floating,
               margin:
-                  const EdgeInsets.only(left: 24.0, right: 24.0, bottom: 80.0),
+                  const EdgeInsets.only(left: 24.0, right: 24.0, bottom: 20.0),
               shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(10)),
               duration: const Duration(seconds: 3),
@@ -789,7 +788,7 @@ class _MyLearningPageState extends State<MyLearningPage> {
               content: Text('Cannot open details.'),
               behavior: SnackBarBehavior.floating,
               margin:
-                  const EdgeInsets.only(left: 24.0, right: 24.0, bottom: 80.0),
+                  const EdgeInsets.only(left: 24.0, right: 24.0, bottom: 20.0),
               shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(10)),
               duration: const Duration(seconds: 3),
@@ -802,7 +801,7 @@ class _MyLearningPageState extends State<MyLearningPage> {
         ScaffoldMessenger.of(currentContext).showSnackBar(SnackBar(
           content: Text('Error preparing details.'),
           behavior: SnackBarBehavior.floating,
-          margin: const EdgeInsets.only(left: 24.0, right: 24.0, bottom: 80.0),
+          margin: const EdgeInsets.only(left: 24.0, right: 24.0, bottom: 20.0),
           shape:
               RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
           duration: const Duration(seconds: 3),

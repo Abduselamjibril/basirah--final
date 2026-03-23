@@ -5,7 +5,7 @@ import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
 import '../theme_provider.dart';
 import 'verify_otp_page.dart';
-import 'contact_info_page.dart'; // <-- NEW IMPORT
+import 'contact_info_page.dart';
 
 class ForgotPasswordPage extends StatefulWidget {
   @override
@@ -25,7 +25,6 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
     }
     setState(() => _isLoading = true);
 
-    // --- NOTE: Make sure your API URL is correct ---
     final url = Uri.parse('https://admin.basirahtv.com/api/forgot-password');
     final headers = {
       "Content-Type": "application/json",
@@ -41,8 +40,6 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
       _showNotification(
           responseData['message'] ?? 'Processing request...', Colors.green);
 
-      // This logic remains correct. If the email exists, the backend sends the code
-      // and we navigate. If not, the user sees the message and can try another way.
       if (response.statusCode == 200) {
         Navigator.push(
           context,
@@ -66,11 +63,14 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
       content: Text(message,
           textAlign: TextAlign.center,
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+          style: const TextStyle(
+              color: Colors.white,
+              fontSize: 15,
+              fontWeight: FontWeight.w600)),
       backgroundColor: color,
       behavior: SnackBarBehavior.floating,
-      margin: const EdgeInsets.all(24.0),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.0)),
+      margin: const EdgeInsets.fromLTRB(24.0, 0.0, 24.0, 20.0),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.0)),
     ));
   }
 
@@ -78,97 +78,219 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
   Widget build(BuildContext context) {
     final themeProvider = Provider.of<ThemeProvider>(context);
     final isDark = themeProvider.isDarkMode;
-    final Color primaryColor =
-        isDark ? const Color(0xFF1E1E1E) : const Color(0xFF009B77);
+    final topPadding = MediaQuery.of(context).padding.top;
+
+    // ── Unified colour palette (synced with Login / Signup) ──
+    const Color accentGreen = Color(0xFF009B77);
+    final Color scaffoldBg = isDark ? const Color(0xFF0D1B2A) : const Color(0xFFF7F8FA);
+    final Color cardBg = isDark ? const Color(0xFF1B2838) : Colors.white;
+    final Color headingColor = isDark ? Colors.white : const Color(0xFF1A1A2E);
+    final Color subtitleColor = isDark ? Colors.grey.shade400 : Colors.grey.shade600;
+    final Color linkColor = isDark ? const Color(0xFF4DD0B5) : accentGreen;
+    final Color backBtnBg = isDark ? Colors.white.withOpacity(0.1) : Colors.black.withOpacity(0.05);
+    final Color backBtnIcon = isDark ? Colors.white : const Color(0xFF1A1A2E);
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text('Reset Password', style: TextStyle(color: Colors.white)),
-        backgroundColor: primaryColor,
-        iconTheme: IconThemeData(color: Colors.white),
-      ),
-      body: Padding(
-        padding: const EdgeInsets.all(24.0),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(
-              'Forgot Your Password?',
-              style: Theme.of(context).textTheme.headlineSmall,
-              textAlign: TextAlign.center,
+      backgroundColor: scaffoldBg,
+      body: Stack(
+        children: [
+          // ── Main scrollable content ──
+          SingleChildScrollView(
+            padding: EdgeInsets.only(
+              left: 28.0,
+              right: 28.0,
+              top: topPadding + 56,
+              bottom: 32,
             ),
-            const SizedBox(height: 16),
-            Text(
-              'Enter your registered email address below. We will send a 6-digit code to reset your password.',
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.bodyMedium,
-            ),
-            const SizedBox(height: 32),
-            TextField(
-              controller: _emailController,
-              decoration: InputDecoration(
-                labelText: 'Email Address',
-                prefixIcon: Icon(Icons.email_outlined),
-                border:
-                    OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-              ),
-              keyboardType: TextInputType.emailAddress,
-            ),
-            const SizedBox(height: 24),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: primaryColor,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10)),
-              ),
-              onPressed: _isLoading ? null : _sendResetCode,
-              child: _isLoading
-                  ? const SizedBox(
-                      height: 24,
-                      width: 24,
-                      child: CircularProgressIndicator(
-                          color: Colors.white, strokeWidth: 3))
-                  : const Text('Send Reset Code',
-                      style: TextStyle(fontSize: 16)),
-            ),
-            const SizedBox(height: 32),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                const SizedBox(height: 12),
 
-            // --- NEW: "Try another way" link ---
-            Center(
-              child: RichText(
-                textAlign: TextAlign.center,
-                text: TextSpan(
-                  style: Theme.of(context)
-                      .textTheme
-                      .bodyMedium
-                      ?.copyWith(color: Colors.grey[600]),
-                  children: [
-                    const TextSpan(text: "Can't use your email? "),
-                    TextSpan(
-                      text: 'Contact Support',
-                      style: const TextStyle(
-                        color: Color(0xFF009B77),
-                        fontWeight: FontWeight.bold,
-                        decoration: TextDecoration.underline,
+                // ── Logo (synced: 160x160) ──
+                Container(
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: accentGreen.withOpacity(isDark ? 0.15 : 0.12),
+                        blurRadius: 40,
+                        spreadRadius: 12,
                       ),
-                      recognizer: TapGestureRecognizer()
-                        ..onTap = () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                                builder: (context) => const ContactInfoPage()),
-                          );
-                        },
-                    ),
-                  ],
+                    ],
+                  ),
+                  child: Image.asset(
+                    isDark ? 'assets/images/logo3.png' : 'assets/images/logo.png',
+                    width: 160,
+                    height: 160,
+                  ),
                 ),
+                const SizedBox(height: 32),
+
+                // ── Heading ──
+                Text('Forgot Your Password?',
+                    style: TextStyle(
+                        fontSize: 28,
+                        fontWeight: FontWeight.w800,
+                        color: headingColor,
+                        letterSpacing: -0.5),
+                    textAlign: TextAlign.center),
+                const SizedBox(height: 10),
+                Text(
+                  'Enter your registered email address below.\nWe will send a 6-digit code to reset your password.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                      fontSize: 14, color: subtitleColor, height: 1.5),
+                ),
+                const SizedBox(height: 32),
+
+                // ── Form Card ──
+                Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: cardBg,
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(isDark ? 0.25 : 0.06),
+                        blurRadius: 16,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: _buildTextField(
+                    controller: _emailController,
+                    label: 'Email Address',
+                    icon: Icons.email_outlined,
+                    inputType: TextInputType.emailAddress,
+                    isDark: isDark,
+                  ),
+                ),
+                const SizedBox(height: 28),
+
+                // ── Send Button ──
+                SizedBox(
+                  width: double.infinity,
+                  height: 52,
+                  child: ElevatedButton(
+                    onPressed: _isLoading ? null : _sendResetCode,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor:
+                          isDark ? const Color(0xFF4DD0B5) : accentGreen,
+                      foregroundColor: isDark ? Colors.black : Colors.white,
+                      elevation: 2,
+                      shadowColor: accentGreen.withOpacity(0.3),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12)),
+                    ),
+                    child: _isLoading
+                        ? const SizedBox(
+                            height: 22,
+                            width: 22,
+                            child: CircularProgressIndicator(
+                                color: Colors.white, strokeWidth: 2.5))
+                        : const Text('Send Reset Code',
+                            style: TextStyle(
+                                fontSize: 17,
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: 0.3)),
+                  ),
+                ),
+                const SizedBox(height: 32),
+
+                // ── Contact Support link ──
+                Center(
+                  child: RichText(
+                    textAlign: TextAlign.center,
+                    text: TextSpan(
+                      style: TextStyle(color: subtitleColor, fontSize: 14),
+                      children: [
+                        const TextSpan(text: "Can't use your email? "),
+                        TextSpan(
+                          text: 'Contact Support',
+                          style: TextStyle(
+                            color: linkColor,
+                            fontWeight: FontWeight.w700,
+                            decoration: TextDecoration.underline,
+                          ),
+                          recognizer: TapGestureRecognizer()
+                            ..onTap = () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                    builder: (context) =>
+                                        const ContactInfoPage()),
+                              );
+                            },
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // ── Floating back button (synced) ──
+          Positioned(
+            top: topPadding + 10,
+            left: 16,
+            child: GestureDetector(
+              onTap: () => Navigator.of(context).pop(),
+              child: Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: backBtnBg,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(Icons.arrow_back_ios_new_rounded,
+                    size: 18, color: backBtnIcon),
               ),
             ),
-          ],
-        ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── Shared text field builder (synced with Login / Signup) ──
+  Widget _buildTextField({
+    required TextEditingController controller,
+    required String label,
+    required IconData icon,
+    TextInputType inputType = TextInputType.text,
+    required bool isDark,
+  }) {
+    final Color fieldFillColor = isDark ? const Color(0xFF0D1B2A) : const Color(0xFFF2F4F6);
+    final Color fieldBorderColor = isDark ? Colors.grey.shade700 : Colors.grey.shade300;
+    const Color fieldFocusedBorderColor = Color(0xFF009B77);
+    const Color fieldIconColor = Color(0xFF009B77);
+    final Color fieldLabelTextColor = isDark ? Colors.grey.shade400 : Colors.grey.shade600;
+    final Color fieldInputTextColor = isDark ? Colors.white : Colors.black;
+
+    return TextField(
+      controller: controller,
+      keyboardType: inputType,
+      style: TextStyle(color: fieldInputTextColor, fontSize: 15),
+      decoration: InputDecoration(
+        labelText: label,
+        labelStyle: TextStyle(color: fieldLabelTextColor, fontSize: 14),
+        prefixIcon: Icon(icon, color: fieldIconColor, size: 20),
+        filled: true,
+        fillColor: fieldFillColor,
+        border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: fieldBorderColor)),
+        enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: fieldBorderColor)),
+        focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide:
+                const BorderSide(color: fieldFocusedBorderColor, width: 1.5)),
+        contentPadding:
+            const EdgeInsets.symmetric(vertical: 14.0, horizontal: 12.0),
       ),
     );
   }

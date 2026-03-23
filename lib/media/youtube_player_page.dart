@@ -243,7 +243,7 @@ class _YouTubePlayerPageState extends State<YouTubePlayerPage>
         _ytController.value.playerState == PlayerState.playing) {
       _logger.d("Starting periodic progress updates every 15 seconds.");
       _progressUpdateTimer =
-          Timer.periodic(const Duration(seconds: 15), (timer) {
+          Timer.periodic(const Duration(seconds: 60), (timer) {
         if (mounted && _ytController.value.playerState == PlayerState.playing) {
           _sendProgressUpdate();
         } else {
@@ -556,14 +556,11 @@ class _YouTubePlayerPageState extends State<YouTubePlayerPage>
                   Expanded(
                     child: Container(
                       color: _belowPlayerBgColor,
-                      child: SingleChildScrollView(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            _buildVideoInfo(),
-                            _buildPlaylist(),
-                          ],
-                        ),
+                      child: CustomScrollView(
+                        slivers: [
+                          SliverToBoxAdapter(child: _buildVideoInfo()),
+                          _buildPlaylistSliver(),
+                        ],
                       ),
                     ),
                   ),
@@ -588,35 +585,39 @@ class _YouTubePlayerPageState extends State<YouTubePlayerPage>
     );
   }
 
-  Widget _buildPlaylist() {
+  Widget _buildPlaylistSliver() {
     final playlistItems = widget.otherEpisodes;
-    if (playlistItems.isEmpty) return const SizedBox.shrink();
+    if (playlistItems.isEmpty) return const SliverToBoxAdapter(child: SizedBox.shrink());
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-          child: Text("Up next",
-              style: TextStyle(
-                  color: _playlistHeaderColor,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600)),
+    return SliverMainAxisGroup(
+      slivers: [
+        SliverToBoxAdapter(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                child: Text("Up next",
+                    style: TextStyle(
+                        color: _playlistHeaderColor,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600)),
+              ),
+              Divider(
+                  color: _dividerColor,
+                  height: 1,
+                  thickness: 1,
+                  indent: 16,
+                  endIndent: 16),
+              const SizedBox(height: 8),
+            ],
+          ),
         ),
-        Divider(
-            color: _dividerColor,
-            height: 1,
-            thickness: 1,
-            indent: 16,
-            endIndent: 16),
-        const SizedBox(height: 8),
-        ListView.builder(
-          shrinkWrap: true,
-          padding: EdgeInsets.zero,
-          physics: const NeverScrollableScrollPhysics(),
-          itemCount: playlistItems.length,
-          itemBuilder: (context, index) =>
-              _buildPlaylistItem(playlistItems[index], index),
+        SliverList(
+          delegate: SliverChildBuilderDelegate(
+            (context, index) => _buildPlaylistItem(playlistItems[index], index),
+            childCount: playlistItems.length,
+          ),
         ),
       ],
     );

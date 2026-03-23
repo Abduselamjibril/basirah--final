@@ -61,7 +61,7 @@ class _GiftPageState extends State<GiftPage> {
       content: Text(message),
       backgroundColor: Colors.green,
       behavior: SnackBarBehavior.floating,
-      margin: const EdgeInsets.only(left: 24.0, right: 24.0, bottom: 80.0),
+      margin: const EdgeInsets.only(left: 24.0, right: 24.0, bottom: 20.0),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       duration: const Duration(seconds: 3),
     ));
@@ -324,8 +324,8 @@ class _GiftPageState extends State<GiftPage> {
               onProfileTapped: () {/* TODO: Implement navigation */},
               onGiftTapped: () {/* Already on this page, do nothing */},
               onThemeToggle: themeProvider.toggleTheme,
-              titleLeftPaddingLight: -2.0,
-              titleLeftPaddingDark: -2.0,
+              titleLeftPaddingLight: 0.0,
+              titleLeftPaddingDark: 0.0,
             ),
           ),
           SliverPadding(

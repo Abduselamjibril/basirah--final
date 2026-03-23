@@ -10,7 +10,7 @@ import '../course/course_detail_page.dart' as CoursePage;
 import '../surah/surah_detail_page.dart';
 import '../story/story_detail_page.dart' as StoryPage;
 import '../deeper_look/deeper_look_detail_page.dart';
-import '../Commentary/commentary_detail_page.dart';
+import '../commentary/commentary_detail_page.dart';
 import '../providers/auth_provider.dart';
 // --- NEW IMPORT ---
 import '../providers/content_cache_provider.dart';
@@ -56,7 +56,7 @@ class _HomePageState extends State<HomePage> {
         const SnackBar(
           content: Text('Please log in to refresh content.'),
           behavior: SnackBarBehavior.floating,
-          margin: EdgeInsets.fromLTRB(24.0, 0.0, 24.0, 70.0),
+          margin: EdgeInsets.fromLTRB(24.0, 0.0, 24.0, 20.0),
         ),
       );
       return;
@@ -71,7 +71,7 @@ class _HomePageState extends State<HomePage> {
         const SnackBar(
           content: Text('Content refreshed successfully!'),
           behavior: SnackBarBehavior.floating,
-          margin: EdgeInsets.fromLTRB(24.0, 0.0, 24.0, 70.0),
+          margin: EdgeInsets.fromLTRB(24.0, 0.0, 24.0, 20.0),
         ),
       );
     }
@@ -358,7 +358,11 @@ class _HomePageState extends State<HomePage> {
       seeAllButton = TextButton(
         onPressed: () {
           ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text("Navigating to $title page...")));
+              SnackBar(
+                content: Text("Navigating to $title page..."),
+                behavior: SnackBarBehavior.floating,
+                margin: const EdgeInsets.fromLTRB(24.0, 0.0, 24.0, 20.0),
+              ));
         },
         child: Text('See All',
             style: TextStyle(
@@ -573,7 +577,10 @@ class _HomePageState extends State<HomePage> {
           break;
         default:
           ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-              content: Text('Cannot open details for this item type.')));
+              content: Text('Cannot open details for this item type.'),
+              behavior: SnackBarBehavior.floating,
+              margin: EdgeInsets.fromLTRB(24.0, 0.0, 24.0, 20.0),
+          ));
       }
 
       if (detailPage != null) {
@@ -595,7 +602,11 @@ class _HomePageState extends State<HomePage> {
       }
     } catch (e, s) {
       ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Error opening details.')));
+          const SnackBar(
+            content: Text('Error opening details.'),
+            behavior: SnackBarBehavior.floating,
+            margin: EdgeInsets.fromLTRB(24.0, 0.0, 24.0, 20.0),
+          ));
     }
   }
 }

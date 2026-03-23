@@ -9,6 +9,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 
 import 'providers/auth_provider.dart';
 import 'providers/content_cache_provider.dart';
+import 'providers/bookmark_provider.dart';
 
 import 'widgets/bottom_navigation_bar.dart';
 import 'bottom_navigation/home_page.dart';
@@ -31,6 +32,7 @@ import 'services/auth_http_service.dart';
 
 import 'screens/gift_page.dart';
 import 'firebase_options.dart';
+import 'package:upgrader/upgrader.dart';
 
 // Overlay widget to show no internet connection
 class NoInternetOverlay extends StatelessWidget {
@@ -165,6 +167,7 @@ Future<void> main() async {
             ChangeNotifierProvider.value(value: themeProvider),
             ChangeNotifierProvider(create: (context) => AuthProvider()),
             ChangeNotifierProvider(create: (context) => ContentCacheProvider()),
+            ChangeNotifierProvider(create: (context) => BookmarkProvider()),
             ChangeNotifierProvider.value(value: notificationService),
           ],
           child: const BayyinahCloneApp(),
@@ -342,34 +345,16 @@ class _MainScreenState extends State<MainScreen> {
   ];
 
   void _showCustomSnackBar(SnackBar snackBar) {
-    final bottomPadding = MediaQuery.of(context).padding.bottom;
-
-    // 1. HEIGHT LOGIC
-    const double navBarHeight = 56.0; // Height of BottomNavigationBarWidget
-    const double miniPlayerHeight = 56.0; // Height of MiniAudioPlayerBar
-
-    // 2. VISIBILITY LOGIC
-    // Determine if the player is currently shown.
-    // Usually you check this via a Provider.
-    // Replace 'true' with your actual condition (e.g. audioProvider.isPlaying)
-    bool isMiniPlayerVisible = true;
-
-    // 3. CALCULATION
-    // If player is visible, push it 112px (56+56)
-    // If player is hidden, push it 56px (just the nav bar)
-    double totalBottomOffset =
-        navBarHeight + (isMiniPlayerVisible ? miniPlayerHeight : 0);
-
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: snackBar.content,
         backgroundColor: snackBar.backgroundColor,
         duration: snackBar.duration,
         behavior: SnackBarBehavior.floating,
-        margin: EdgeInsets.only(
-          left: 16.0,
-          right: 16.0,
-          bottom: totalBottomOffset + bottomPadding,
+        margin: const EdgeInsets.only(
+          left: 24.0,
+          right: 24.0,
+          bottom: 20.0,
         ),
         shape: snackBar.shape ??
             RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.0)),
@@ -449,6 +434,9 @@ class _MainScreenState extends State<MainScreen> {
       Provider.of<ContentCacheProvider>(context, listen: false)
           .fetchAllContent(token: authProvider.token!);
 
+      Provider.of<BookmarkProvider>(context, listen: false)
+          .fetchBookmarks(authProvider.token!);
+
       Provider.of<NotificationService>(context, listen: false)
           .fetchApiNotifications(token: authProvider.token);
     }
@@ -486,21 +474,27 @@ class _MainScreenState extends State<MainScreen> {
         },
         onThemeToggle: themeProvider.toggleTheme,
       ),
-      body: IndexedStack(
-        index: _currentIndex,
-        children: _pages,
+      body: UpgradeAlert(
+        upgrader: Upgrader(),
+        showIgnore: false,
+        showLater: false,
+        child: Column(
+          children: [
+            Expanded(
+              child: IndexedStack(
+                index: _currentIndex,
+                children: _pages,
+              ),
+            ),
+            const MiniAudioPlayerBar(),
+          ],
+        ),
       ),
-      bottomNavigationBar: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const MiniAudioPlayerBar(),
-          BottomNavigationBarWidget(
-            currentIndex: _currentIndex,
-            onTap: (index) {
-              _switchToBottomNavPage(index);
-            },
-          ),
-        ],
+      bottomNavigationBar: BottomNavigationBarWidget(
+        currentIndex: _currentIndex,
+        onTap: (index) {
+          _switchToBottomNavPage(index);
+        },
       ),
     );
   }

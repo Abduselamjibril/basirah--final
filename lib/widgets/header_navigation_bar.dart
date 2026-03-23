@@ -53,19 +53,15 @@ class HeaderNavigationBar extends StatelessWidget
               : Colors.white.withOpacity(0.85),
           title: Padding(
             padding: EdgeInsets.only(
-              top: isNightMode ? 16.0 : 4.0, // Move down in dark mode
-              left: isNightMode
-                  ? (titleLeftPaddingDark ?? 4.0)
-                  : (titleLeftPaddingLight ?? 16.0),
-              right: 0.0,
-              bottom: 0.0,
+              top: 10.0,
+              left: (titleLeftPaddingLight ?? 4.0).clamp(0.0, double.infinity),
             ),
             child: Image.asset(
               isNightMode
                   ? 'assets/images/logo3.png'
                   : 'assets/images/logo.png',
-              height:
-                  isNightMode ? 130.0 : 110.0, // Slightly smaller in dark mode
+              height: 130.0,
+              gaplessPlayback: true, // Prevents flickering when switching themes
             ),
           ),
           actions: [

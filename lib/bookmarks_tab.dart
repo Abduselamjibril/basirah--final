@@ -7,11 +7,12 @@ import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import '../services/bookmark_service.dart';
 import '../providers/auth_provider.dart';
 import '../theme_provider.dart';
+import '../providers/bookmark_provider.dart';
 
 import 'course/course_detail_page.dart';
 import 'surah/surah_detail_page.dart';
 import 'story/story_detail_page.dart';
-import 'Commentary/commentary_detail_page.dart';
+import 'commentary/commentary_detail_page.dart';
 import 'deeper_look/deeper_look_detail_page.dart';
 import '/../media/video_player_page.dart';
 import '/../media/audio_player_page.dart';
@@ -28,79 +29,38 @@ class BookmarksTab extends StatefulWidget {
 
 class _BookmarksTabState extends State<BookmarksTab>
     with AutomaticKeepAliveClientMixin<BookmarksTab> {
-  // --- STATE MANAGEMENT REFACTORED ---
-  final BookmarkService _bookmarkService = BookmarkService();
-  List<dynamic> _allBookmarks = []; // This holds the raw API response
   final DefaultCacheManager _cacheManager = DefaultCacheManager();
   bool _prefetchedImages = false;
-
-  // These are now COMPUTED properties that filter the single source of truth
-  List<dynamic> get _bookmarkedContent => _allBookmarks
-      .where((b) =>
-          b['bookmarkable'] != null &&
-          b['bookmarkable_type'] is String &&
-          !b['bookmarkable_type'].contains('Episode'))
-      .toList();
-
-  List<dynamic> get _bookmarkedEpisodes => _allBookmarks
-      .where((b) =>
-          b['bookmarkable'] != null &&
-          b['bookmarkable_type'] is String &&
-          b['bookmarkable_type'].contains('Episode'))
-      .toList();
-
-  bool _isLoading = true;
-  String _error = '';
   int _selectedIndex = 0; // 0 for Content, 1 for Episodes
 
   @override
   void initState() {
     super.initState();
-    // We use addPostFrameCallback to ensure the Provider is available
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _loadBookmarks();
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      final bookmarkProvider =
+          Provider.of<BookmarkProvider>(context, listen: false);
+      if (authProvider.token != null) {
+        bookmarkProvider.fetchBookmarks(authProvider.token!);
+      }
     });
   }
 
   // --- DATA FETCHING REFACTORED ---
   Future<void> _loadBookmarks() async {
-    if (!mounted) return;
-    setState(() {
-      _isLoading = true;
-      _error = '';
-    });
-
-    try {
-      final authProvider = Provider.of<AuthProvider>(context, listen: false);
-      final token = authProvider.token;
-      if (token == null) {
-        throw Exception('User is not authenticated. Please log in.');
-      }
-
-      // SINGLE API CALL to get all bookmarks!
-      final bookmarks = await _bookmarkService.fetchAllBookmarks(token);
-
-      if (!mounted) return;
-      setState(() {
-        _allBookmarks = bookmarks;
-      });
-      _prefetchBookmarkedImages();
-    } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _error = "Failed to load bookmarks. Please check your connection.";
-      });
-    } finally {
-      if (!mounted) return;
-      setState(() {
-        _isLoading = false;
-      });
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final bookmarkProvider =
+        Provider.of<BookmarkProvider>(context, listen: false);
+    if (authProvider.token != null) {
+      await bookmarkProvider.fetchBookmarks(authProvider.token!);
     }
   }
 
   // --- TOGGLE LOGIC REFACTORED ---
   Future<void> _toggleBookmark(dynamic bookmark) async {
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final bookmarkProvider =
+        Provider.of<BookmarkProvider>(context, listen: false);
     final token = authProvider.token;
     if (token == null) {
       _showSnackbar('Authentication error.', isError: true);
@@ -118,24 +78,18 @@ class _BookmarksTabState extends State<BookmarksTab>
       return;
     }
 
-    // Optimistically remove the item from the list for a snappy UI
-    setState(() {
-      _allBookmarks.removeWhere((b) => b['id'] == bookmark['id']);
-    });
-
     try {
-      final message = await _bookmarkService.toggleBookmark(
+      await bookmarkProvider.toggleBookmark(
         token: token,
-        bookmarkableType: apiType,
-        bookmarkableId: bookmarkableId,
+        type: apiType,
+        id: bookmarkableId,
       );
-      _showSnackbar(message);
-      // We don't need to call _loadBookmarks() again due to optimistic removal
+      if (!mounted) return;
+      _showSnackbar("Bookmark removed");
     } catch (e) {
+      if (!mounted) return;
       _showSnackbar('Error updating bookmark. Please try again.',
           isError: true);
-      // If the API call fails, refresh the list to add the item back
-      _loadBookmarks();
     }
   }
 
@@ -192,7 +146,7 @@ class _BookmarksTabState extends State<BookmarksTab>
             ? Colors.redAccent.shade700
             : (isNightMode ? Colors.grey[700] : const Color(0xFF009B77)),
         behavior: SnackBarBehavior.floating,
-        margin: const EdgeInsets.only(left: 24.0, right: 24.0, bottom: 80.0),
+        margin: const EdgeInsets.only(left: 24.0, right: 24.0, bottom: 20.0),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         duration: const Duration(seconds: 3),
       ),
@@ -215,27 +169,48 @@ class _BookmarksTabState extends State<BookmarksTab>
 
     return Scaffold(
       backgroundColor: scaffoldBgColor,
-      body: RefreshIndicator(
-        onRefresh: _loadBookmarks,
-        color: refreshIndicatorSpinnerColor,
-        backgroundColor: refreshIndicatorBgColor,
-        child: CustomScrollView(
-          slivers: [
-            SliverToBoxAdapter(
-                child: _buildSegmentedControl(isNightMode, primaryColor)),
-            _isLoading
-                ? _buildLoadingState(isNightMode)
-                : _error.isNotEmpty
-                    ? _buildErrorState(isNightMode, _error)
-                    : SliverPadding(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 16.0, vertical: 8.0),
-                        sliver: _selectedIndex == 0
-                            ? _buildContentList(isNightMode, primaryColor)
-                            : _buildEpisodesList(isNightMode, primaryColor),
-                      ),
-          ],
-        ),
+      body: Consumer<BookmarkProvider>(
+        builder: (context, bookmarkProvider, child) {
+          final allBookmarks = bookmarkProvider.allBookmarks;
+          final bookmarkedContent = allBookmarks
+              .where((b) =>
+                  b['bookmarkable'] != null &&
+                  b['bookmarkable_type'] is String &&
+                  !b['bookmarkable_type'].toString().contains('Episode'))
+              .toList();
+
+          final bookmarkedEpisodes = allBookmarks
+              .where((b) =>
+                  b['bookmarkable'] != null &&
+                  b['bookmarkable_type'] is String &&
+                  b['bookmarkable_type'].toString().contains('Episode'))
+              .toList();
+
+          return RefreshIndicator(
+            onRefresh: _loadBookmarks,
+            color: refreshIndicatorSpinnerColor,
+            backgroundColor: refreshIndicatorBgColor,
+            child: CustomScrollView(
+              slivers: [
+                SliverToBoxAdapter(
+                    child: _buildSegmentedControl(isNightMode, primaryColor)),
+                bookmarkProvider.isLoading && allBookmarks.isEmpty
+                    ? _buildLoadingState(isNightMode)
+                    : bookmarkProvider.error != null && allBookmarks.isEmpty
+                        ? _buildErrorState(isNightMode, bookmarkProvider.error!)
+                        : SliverPadding(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 16.0, vertical: 8.0),
+                            sliver: _selectedIndex == 0
+                                ? _buildContentList(
+                                    isNightMode, primaryColor, bookmarkedContent)
+                                : _buildEpisodesList(
+                                    isNightMode, primaryColor, bookmarkedEpisodes),
+                          ),
+              ],
+            ),
+          );
+        },
       ),
     );
   }
@@ -243,9 +218,8 @@ class _BookmarksTabState extends State<BookmarksTab>
   @override
   bool get wantKeepAlive => true;
 
-  Widget _buildContentList(bool isNightMode, Color primaryColor) {
-    final List<dynamic> allContent = _bookmarkedContent;
-
+  Widget _buildContentList(
+      bool isNightMode, Color primaryColor, List<dynamic> allContent) {
     if (allContent.isEmpty) {
       return _buildEmptyListState(isNightMode, isContent: true);
     }
@@ -340,8 +314,7 @@ class _BookmarksTabState extends State<BookmarksTab>
               return;
           }
           Navigator.push(
-                  context, MaterialPageRoute(builder: (context) => detailPage))
-              .then((_) => _loadBookmarks());
+              context, MaterialPageRoute(builder: (context) => detailPage));
         },
         child: Padding(
           padding: const EdgeInsets.all(12.0),
@@ -387,9 +360,8 @@ class _BookmarksTabState extends State<BookmarksTab>
     );
   }
 
-  Widget _buildEpisodesList(bool isNightMode, Color primaryColor) {
-    final List<dynamic> allEpisodes = _bookmarkedEpisodes;
-
+  Widget _buildEpisodesList(
+      bool isNightMode, Color primaryColor, List<dynamic> allEpisodes) {
     if (allEpisodes.isEmpty) {
       return _buildEmptyListState(isNightMode, isContent: false);
     }
@@ -734,27 +706,6 @@ class _BookmarksTabState extends State<BookmarksTab>
     }
   }
 
-  void _prefetchBookmarkedImages({int limit = 24}) {
-    if (_prefetchedImages) return;
-    final urls = <String>[];
-    for (final b in _bookmarkedContent) {
-      final data = Map<String, dynamic>.from(b['bookmarkable'] ?? {});
-      final imagePath = (data['image_path'] ?? data['image'])?.toString();
-      if (imagePath != null && imagePath.isNotEmpty) {
-        urls.add('$_apiBaseUrl/storage/$imagePath');
-        if (urls.length >= limit) break;
-      }
-    }
-    if (urls.isEmpty) return;
-    _prefetchedImages = true;
-    for (final url in urls) {
-      unawaited(_cacheManager.getFileFromCache(url).then((cached) async {
-        if (cached == null) {
-          await _cacheManager.downloadFile(url);
-        }
-      }).catchError((_) {}));
-    }
-  }
 
   Widget _buildEmptyListState(bool isNightMode, {required bool isContent}) {
     final Color iconColor = isNightMode ? Colors.grey[600]! : Colors.grey[400]!;

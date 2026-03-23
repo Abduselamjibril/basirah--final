@@ -32,6 +32,9 @@ class _SplashScreenState extends State<SplashScreen> {
     }).catchError((_) {});
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      // Precache the main and dark mode logos for smooth theme switching
+      precacheImage(const AssetImage('assets/images/logo.png'), context);
+      precacheImage(const AssetImage('assets/images/logo3.png'), context);
       _initializeAppAndNavigate();
     });
   }

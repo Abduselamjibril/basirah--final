@@ -35,7 +35,7 @@ class _MyListPageState extends State<MyListPage> {
     final themeProvider = Provider.of<ThemeProvider>(context);
     final isNightMode = themeProvider.isDarkMode;
     final primaryColor = Color(0xFF009B77);
-    final backgroundColor = isNightMode ? Color(0xFF121212) : Colors.grey[50];
+    final backgroundColor = themeProvider.currentTheme.scaffoldBackgroundColor;
     final appBarColor = isNightMode ? Color(0xFF1F1F1F) : primaryColor;
     final unselectedTextColor =
         isNightMode ? Colors.white70 : Colors.white.withOpacity(0.7);

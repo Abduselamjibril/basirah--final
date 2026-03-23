@@ -11,6 +11,7 @@ import '../services/bookmark_service.dart'; // Using the new unified service
 import '../services/content_services/data_fetcher.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/content_cache_provider.dart';
+import '../../providers/bookmark_provider.dart';
 
 class CoursesPage extends StatefulWidget {
   const CoursesPage({super.key});
@@ -20,14 +21,12 @@ class CoursesPage extends StatefulWidget {
 
 class _CoursesPageState extends State<CoursesPage> {
   // --- STATE AND SERVICE REFACTOR ---
-  final BookmarkService _bookmarkService = BookmarkService();
   List<dynamic> courses = [];
   List<dynamic> filteredCourses = [];
-  Map<int, bool> bookmarks = {};
   bool isLoading = true;
   String? errorMessage;
   TextEditingController searchController = TextEditingController();
-  String? selectedCategory;
+  String? selectedCategory = 'Introduction to Quran';
   bool _imagesPrefetched = false;
   final DefaultCacheManager _cacheManager = DefaultCacheManager();
 
@@ -93,14 +92,13 @@ class _CoursesPageState extends State<CoursesPage> {
 
     if (token == null) {
       _logger.w("Cannot fetch courses: User is not logged in (token is null).");
-      if (mounted) {
-        setState(() {
-          isLoading = false;
-          errorMessage = "Please log in to view courses.";
-          courses = [];
-          bookmarks = {};
-        });
-      }
+        if (mounted) {
+          setState(() {
+            isLoading = false;
+            errorMessage = "Please log in to view courses.";
+            courses = [];
+          });
+        }
       return;
     }
 
@@ -113,25 +111,12 @@ class _CoursesPageState extends State<CoursesPage> {
         token: token,
         forceRefresh: forceRefresh,
       );
-      final bookmarksFuture = _bookmarkService.fetchAllBookmarks(token);
-
       final contentResult = await contentFuture;
-      final allBookmarks = await bookmarksFuture;
-
-      final bookmarkedIds = allBookmarks
-          .where((b) => b['bookmarkable_type'].endsWith('Course'))
-          .map((b) => int.parse(b['bookmarkable_id'].toString()))
-          .toSet();
-
       if (!mounted) return;
+      
       setState(() {
         courses = contentResult['data'];
         errorMessage = contentResult['error'];
-        bookmarks = {
-          for (var item in courses)
-            int.parse(item['id'].toString()):
-                bookmarkedIds.contains(int.parse(item['id'].toString()))
-        };
         if (uniqueCategories.isNotEmpty && selectedCategory == null) {
           selectedCategory = uniqueCategories.first;
         }
@@ -144,12 +129,12 @@ class _CoursesPageState extends State<CoursesPage> {
       _prefetchImages(courses);
 
       _logger.i(
-          "Successfully fetched ${courses.length} courses and ${bookmarks.length} course bookmarks.");
+          "Successfully fetched ${courses.length} courses.");
 
       if (errorMessage != null && courses.isEmpty) {
         _logger
             .w("Data fetched but with an error from the source: $errorMessage");
-        _showErrorSnackbar(errorMessage!);
+        if (mounted) _showErrorSnackbar(errorMessage!);
       }
     } catch (e, stackTrace) {
       _logger.e("Error fetching courses data", e, stackTrace);
@@ -182,31 +167,30 @@ class _CoursesPageState extends State<CoursesPage> {
   Future<void> _toggleCourseBookmark(int courseId) async {
     _logger.i("Toggling bookmark for course ID: $courseId");
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final bookmarkProvider =
+        Provider.of<BookmarkProvider>(context, listen: false);
     final token = authProvider.token;
 
     if (token == null) {
-      _logger.w("Cannot toggle course bookmark: User is not logged in.");
       _showErrorSnackbar("Please log in to manage bookmarks.");
       return;
     }
 
-    final isCurrentlyBookmarked = bookmarks[courseId] ?? false;
-    setState(() => bookmarks[courseId] = !isCurrentlyBookmarked);
-
     try {
-      // --- TOGGLE LOGIC REFACTORED ---
-      final message = await _bookmarkService.toggleBookmark(
-          token: token,
-          bookmarkableType: 'course', // Simple API type string
-          bookmarkableId: courseId);
-      _logger.i(
-          "Bookmark toggled successfully for course ID: $courseId. Message: $message");
-      _showSuccessSnackbar(message);
+      await bookmarkProvider.toggleBookmark(
+        token: token,
+        type: 'course',
+        id: courseId,
+      );
+      if (!mounted) return;
+      _showSuccessSnackbar(bookmarkProvider.isBookmarked('course', courseId)
+          ? "Course bookmarked"
+          : "Bookmark removed");
     } catch (e, stackTrace) {
+      if (!mounted) return;
       _logger.e("Error toggling course bookmark for course ID: $courseId", e,
           stackTrace);
-      setState(() => bookmarks[courseId] = isCurrentlyBookmarked);
-      _showErrorSnackbar("Error updating bookmark. Please try again.");
+      _showErrorSnackbar("Error updating bookmark.");
     }
   }
 
@@ -320,7 +304,7 @@ class _CoursesPageState extends State<CoursesPage> {
         backgroundColor:
             isNightMode ? Colors.grey[700] : const Color(0xFF009B77),
         behavior: SnackBarBehavior.floating,
-        margin: const EdgeInsets.only(left: 24.0, right: 24.0, bottom: 80.0),
+        margin: const EdgeInsets.only(left: 24.0, right: 24.0, bottom: 20.0),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         duration: const Duration(seconds: 2)));
   }
@@ -332,7 +316,7 @@ class _CoursesPageState extends State<CoursesPage> {
         content: Text(message),
         backgroundColor: Colors.redAccent.shade700,
         behavior: SnackBarBehavior.floating,
-        margin: const EdgeInsets.only(left: 24.0, right: 24.0, bottom: 80.0),
+        margin: const EdgeInsets.only(left: 24.0, right: 24.0, bottom: 20.0),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         duration: const Duration(seconds: 3)));
   }
@@ -346,19 +330,9 @@ class _CoursesPageState extends State<CoursesPage> {
     final authProvider = Provider.of<AuthProvider>(context);
     final bool isUserPremium = authProvider.isPremium;
 
-    return Scaffold(
-      backgroundColor: isNightMode ? const Color(0xFF002147) : Colors.white,
-      appBar: AppBar(
-        backgroundColor:
-            isNightMode ? Colors.grey[900] : const Color(0xFF009B77),
-        elevation: 0,
-        title: const Text('Quranic Courses',
-            style: TextStyle(color: Colors.white)),
-        centerTitle: true,
-      ),
-      body: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: _gridHorizontalPadding),
-        child: Column(
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: _gridHorizontalPadding),
+      child: Column(
           children: [
             if (!isLoading && categories.isNotEmpty)
               Padding(
@@ -390,69 +364,69 @@ class _CoursesPageState extends State<CoursesPage> {
             ),
             const SizedBox(height: 16),
             Expanded(
-              // --- PULL-TO-REFRESH ---
-              // This RefreshIndicator widget handles the "pull to refresh"
-              // functionality for the entire course grid.
-              child: RefreshIndicator(
-                onRefresh: () => _fetchData(forceRefresh: true),
-                color: isNightMode ? Colors.white : const Color(0xFF009B77),
-                backgroundColor: isNightMode ? Colors.grey[900] : Colors.white,
-                child: isLoading
-                    ? Center(
-                        child: CircularProgressIndicator(
-                            color: isNightMode
-                                ? Colors.white
-                                : const Color(0xFF009B77)))
-                    : errorMessage != null && courses.isEmpty
-                        ? _buildErrorState(
-                            errorMessage!, () => _fetchData(forceRefresh: true))
-                        : filteredCourses.isEmpty
-                            ? _buildEmptyState(
-                                isNightMode, searchController.text.isNotEmpty)
-                            : GridView.builder(
-                                controller: _scrollController,
-                                gridDelegate:
-                                    const SliverGridDelegateWithFixedCrossAxisCount(
-                                  crossAxisCount: 2,
-                                  crossAxisSpacing: _crossAxisSpacing,
-                                  mainAxisSpacing: _mainAxisSpacing,
-                                  childAspectRatio: _childAspectRatio,
-                                ),
-                                itemCount: filteredCourses.length,
-                                itemBuilder: (context, index) {
-                                  final course = filteredCourses[index];
-                                  final courseId =
-                                      int.parse(course['id'].toString());
-                                  return GestureDetector(
-                                    onTap: () {
-                                      _logger.d(
-                                          "Navigating to CourseDetailPage for ID: $courseId");
-                                      Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                          builder: (context) =>
-                                              CourseDetailPage(course: course),
-                                        ),
-                                      ).then((_) =>
-                                          _fetchData(forceRefresh: true));
-                                    },
-                                    child: _buildCourseCard(
-                                      course: course,
-                                      isNightMode: isNightMode,
-                                      isBookmarked:
-                                          bookmarks[courseId] ?? false,
-                                      onBookmark: () =>
-                                          _toggleCourseBookmark(courseId),
-                                      isUserPremium: isUserPremium,
+              child: Consumer<BookmarkProvider>(
+                builder: (context, bookmarkProvider, child) {
+                  return RefreshIndicator(
+                    onRefresh: () => _fetchData(forceRefresh: true),
+                    color: isNightMode ? Colors.white : const Color(0xFF009B77),
+                    backgroundColor: isNightMode ? Colors.grey[900] : Colors.white,
+                    child: isLoading
+                        ? Center(
+                            child: CircularProgressIndicator(
+                                color: isNightMode
+                                    ? Colors.white
+                                    : const Color(0xFF009B77)))
+                        : errorMessage != null && courses.isEmpty
+                            ? _buildErrorState(errorMessage!,
+                                () => _fetchData(forceRefresh: true))
+                            : filteredCourses.isEmpty
+                                ? _buildEmptyState(isNightMode,
+                                    searchController.text.isNotEmpty)
+                                : GridView.builder(
+                                    controller: _scrollController,
+                                    gridDelegate:
+                                        const SliverGridDelegateWithFixedCrossAxisCount(
+                                      crossAxisCount: 2,
+                                      crossAxisSpacing: _crossAxisSpacing,
+                                      mainAxisSpacing: _mainAxisSpacing,
+                                      childAspectRatio: _childAspectRatio,
                                     ),
-                                  );
-                                },
-                              ),
+                                    itemCount: filteredCourses.length,
+                                    itemBuilder: (context, index) {
+                                      final course = filteredCourses[index];
+                                      final courseId =
+                                          int.parse(course['id'].toString());
+                                      return GestureDetector(
+                                        onTap: () {
+                                          _logger.d(
+                                              "Navigating to CourseDetailPage for ID: $courseId");
+                                          Navigator.push(
+                                            context,
+                                            MaterialPageRoute(
+                                              builder: (context) =>
+                                                  CourseDetailPage(
+                                                      course: course),
+                                            ),
+                                          );
+                                        },
+                                        child: _buildCourseCard(
+                                          course: course,
+                                          isNightMode: isNightMode,
+                                          isBookmarked: bookmarkProvider
+                                              .isBookmarked('course', courseId),
+                                          onBookmark: () =>
+                                              _toggleCourseBookmark(courseId),
+                                          isUserPremium: isUserPremium,
+                                        ),
+                                      );
+                                    },
+                                  ),
+                  );
+                },
               ),
             ),
           ],
         ),
-      ),
     );
   }
 
