@@ -2,7 +2,7 @@ name: basirahtv
 description: "Basirah App"
 publish_to: 'none' 
 
-version: 1.1.5+9
+version: 1.1.9+10
 
 environment:
   sdk: '>=3.3.0 <4.0.0' # It's good practice to allow a range
@@ -50,8 +50,7 @@ dependencies:
   cached_network_image: ^3.3.1
   wakelock_plus: ^1.2.5
   screen_brightness: ^2.1.7
-
-package_info_plus: ^4.0.0
+  package_info_plus: ^8.3.1
   
   
   # url_launcher_web is brought in by url_launcher, so it's not always needed here.

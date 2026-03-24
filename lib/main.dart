@@ -33,6 +33,9 @@ import 'services/auth_http_service.dart';
 import 'screens/gift_page.dart';
 import 'firebase_options.dart';
 import 'package:upgrader/upgrader.dart';
+import 'package:package_info_plus/package_info_plus.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'services/versioning_service.dart';
 
 // Overlay widget to show no internet connection
 class NoInternetOverlay extends StatelessWidget {
@@ -308,11 +311,120 @@ class _BayyinahCloneAppState extends State<BayyinahCloneApp> {
       builder: (context, child) {
         return Stack(
           children: [
-            child!,
+            ForceUpdateWrapper(child: child!),
             if (_isOffline) const NoInternetOverlay(),
           ],
         );
       },
+    );
+  }
+}
+
+class ForceUpdateWrapper extends StatefulWidget {
+  final Widget child;
+  const ForceUpdateWrapper({super.key, required this.child});
+
+  @override
+  State<ForceUpdateWrapper> createState() => _ForceUpdateWrapperState();
+}
+
+class _ForceUpdateWrapperState extends State<ForceUpdateWrapper> {
+  bool _needsUpdate = false;
+  String? _storeVersion;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkVersion();
+  }
+
+  Future<void> _checkVersion() async {
+    print('DEBUG: [FORCE_UPDATE] Starting custom version check');
+    final packageInfo = await PackageInfo.fromPlatform();
+    final installedVersion = packageInfo.version;
+    print('DEBUG: [FORCE_UPDATE] Installed Version: $installedVersion');
+
+    final storeVersion = await VersioningService.getLatestVersion();
+    print('DEBUG: [FORCE_UPDATE] Store Version: $storeVersion');
+
+    if (storeVersion != null && storeVersion != installedVersion) {
+      if (mounted) {
+        setState(() {
+          _needsUpdate = true;
+          _storeVersion = storeVersion;
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!_needsUpdate) return widget.child;
+
+    return Stack(
+      children: [
+        widget.child,
+        Container(
+          color: Colors.black.withOpacity(0.85),
+          child: Center(
+            child: Card(
+              margin: const EdgeInsets.symmetric(horizontal: 32),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(20)),
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.system_update,
+                        size: 64, color: Color(0xFF009B77)),
+                    const SizedBox(height: 16),
+                    const Text(
+                      'Update Required',
+                      style: TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black87,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      'A new version ($_storeVersion) is available. Please update to continue using Basirah TV.',
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(fontSize: 16, color: Colors.black54),
+                    ),
+                    const SizedBox(height: 24),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: () async {
+                          final url = Uri.parse(
+                              'https://play.google.com/store/apps/details?id=com.basirahtv.app');
+                          if (await canLaunchUrl(url)) {
+                            await launchUrl(url,
+                                mode: LaunchMode.externalApplication);
+                          }
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF009B77),
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12)),
+                        ),
+                        child: const Text('UPDATE NOW',
+                            style: TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16)),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -474,21 +586,16 @@ class _MainScreenState extends State<MainScreen> {
         },
         onThemeToggle: themeProvider.toggleTheme,
       ),
-      body: UpgradeAlert(
-        upgrader: Upgrader(),
-        showIgnore: false,
-        showLater: false,
-        child: Column(
-          children: [
-            Expanded(
-              child: IndexedStack(
-                index: _currentIndex,
-                children: _pages,
-              ),
+      body: Column(
+        children: [
+          Expanded(
+            child: IndexedStack(
+              index: _currentIndex,
+              children: _pages,
             ),
-            const MiniAudioPlayerBar(),
-          ],
-        ),
+          ),
+          const MiniAudioPlayerBar(),
+        ],
       ),
       bottomNavigationBar: BottomNavigationBarWidget(
         currentIndex: _currentIndex,

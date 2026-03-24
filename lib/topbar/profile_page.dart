@@ -1,7 +1,9 @@
-// lib/topbar/profile_page.dart
-
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:package_info_plus/package_info_plus.dart';
+import 'package:upgrader/upgrader.dart';
+import 'package:url_launcher/url_launcher.dart';
+import '../services/versioning_service.dart';
 import 'login_page.dart';
 import '../theme_provider.dart';
 import 'about_page.dart';
@@ -213,44 +215,147 @@ class _ProfileHeader extends StatelessWidget {
   }
 }
 
-class _ProfileOptions extends StatelessWidget {
+class _ProfileOptions extends StatefulWidget {
   final _ProfileColors colors;
   const _ProfileOptions({required this.colors});
+
+  @override
+  State<_ProfileOptions> createState() => _ProfileOptionsState();
+}
+
+class _ProfileOptionsState extends State<_ProfileOptions> {
+  bool _isCheckingUpdate = false;
+
+  Future<void> _checkForUpdate() async {
+    if (_isCheckingUpdate) return;
+    setState(() => _isCheckingUpdate = true);
+
+    try {
+      print('DEBUG: [MANUAL_UPDATE] Manual update check started');
+      final packageInfo = await PackageInfo.fromPlatform();
+      final installedVersion = packageInfo.version;
+      print('DEBUG: [MANUAL_UPDATE] Installed Version: $installedVersion');
+
+      final storeVersion = await VersioningService.getLatestVersion();
+      print('DEBUG: [MANUAL_UPDATE] Custom scraper version found: $storeVersion');
+
+      if (!mounted) return;
+
+      if (storeVersion != null && storeVersion != installedVersion) {
+        // Newer version available
+        final shouldUpdate = await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            title: const Row(
+              children: [
+                Icon(Icons.system_update, color: Color(0xFF009B77)),
+                SizedBox(width: 10),
+                Text('Update Available'),
+              ],
+            ),
+            content: Text(
+              'A new version ($storeVersion) is available.\n'
+              'You currently have version $installedVersion.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('Later', style: TextStyle(color: Colors.grey)),
+              ),
+              ElevatedButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF009B77),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                ),
+                child: const Text('Update Now', style: TextStyle(color: Colors.white)),
+              ),
+            ],
+          ),
+        );
+
+        if (shouldUpdate == true) {
+          final uri = Uri.parse(
+            'https://play.google.com/store/apps/details?id=com.basirahtv.app',
+          );
+          if (await canLaunchUrl(uri)) {
+            await launchUrl(uri, mode: LaunchMode.externalApplication);
+          }
+        }
+      } else {
+        // Already up to date
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.check_circle, color: Colors.white),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'You\'re up to date! (v$installedVersion)',
+                    style: const TextStyle(color: Colors.white),
+                  ),
+                ),
+              ],
+            ),
+            backgroundColor: const Color(0xFF009B77),
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Could not check for updates. Please try again later.'),
+          backgroundColor: Colors.red,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _isCheckingUpdate = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Card(
         elevation: 2,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        color: colors.card,
+        color: widget.colors.card,
         child: Column(children: [
           _ProfileOptionTile(
               icon: Icons.edit_outlined,
               title: 'Edit Profile',
               onTap: () => Navigator.push(context,
                   MaterialPageRoute(builder: (_) => const EditProfilePage())),
-              iconColor: colors.primary,
-              textColor: colors.text,
+              iconColor: widget.colors.primary,
+              textColor: widget.colors.text,
               isFirst: true),
-          Divider(color: colors.divider, height: 1, indent: 68, endIndent: 16),
+          Divider(color: widget.colors.divider, height: 1, indent: 68, endIndent: 16),
           _ProfileOptionTile(
               icon: Icons.info_outline_rounded,
               title: 'About Basirah TV',
               onTap: () => Navigator.push(context,
                   MaterialPageRoute(builder: (_) => const AboutPage())),
-              iconColor: colors.primary,
-              textColor: colors.text,
+              iconColor: widget.colors.primary,
+              textColor: widget.colors.text,
               isFirst: false),
-          Divider(color: colors.divider, height: 1, indent: 68, endIndent: 16),
+          Divider(color: widget.colors.divider, height: 1, indent: 68, endIndent: 16),
           _ProfileOptionTile(
             icon: Icons.quiz_outlined,
             title: 'FAQ',
             onTap: () => Navigator.push(
                 context, MaterialPageRoute(builder: (_) => FaqPage())),
-            iconColor: colors.primary,
-            textColor: colors.text,
+            iconColor: widget.colors.primary,
+            textColor: widget.colors.text,
             isLast: false,
           ),
-          Divider(color: colors.divider, height: 1, indent: 68, endIndent: 16),
+          Divider(color: widget.colors.divider, height: 1, indent: 68, endIndent: 16),
           _ProfileOptionTile(
               icon: Icons.password_rounded,
               title: 'Change Password',
@@ -258,8 +363,16 @@ class _ProfileOptions extends StatelessWidget {
                   context,
                   MaterialPageRoute(
                       builder: (_) => const ChangePasswordPage())),
-              iconColor: colors.primary,
-              textColor: colors.text,
+              iconColor: widget.colors.primary,
+              textColor: widget.colors.text,
+              isLast: false),
+          Divider(color: widget.colors.divider, height: 1, indent: 68, endIndent: 16),
+          _ProfileOptionTile(
+              icon: Icons.system_update_outlined,
+              title: _isCheckingUpdate ? 'Checking for updates...' : 'Check for Updates',
+              onTap: _checkForUpdate,
+              iconColor: widget.colors.primary,
+              textColor: widget.colors.text,
               isLast: true),
         ]));
   }
