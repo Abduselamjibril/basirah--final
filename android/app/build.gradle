@@ -29,8 +29,8 @@ android {
         applicationId = "com.basirahtv.app"
         minSdk = flutter.minSdkVersion
         targetSdk = 36
-        versionCode = 10
-        versionName = "1.1.9"
+        versionCode = 12
+        versionName = "1.2.0"
     }
 
     signingConfigs {
