@@ -40,6 +40,7 @@ use App\Http\Controllers\AboutUsController;
 use App\Http\Controllers\PrivacyPolicyController;
 use App\Http\Controllers\TermsAndAgreementController;
 use App\Http\Controllers\ContactInformationController;
+use App\Http\Controllers\QuestionController;
 
 
 use Laravel\Sanctum\Http\Middleware\EnsureFrontendRequestsAreStateful;
@@ -132,6 +133,10 @@ Route::prefix('admin')->group(function () {
         Route::post('/notifications', [NotificationController::class, 'createNotification']);
         Route::apiResource('notifications', NotificationController::class)->except(['index', 'store']);
         Route::post('/notifications/update-status', [NotificationController::class, 'updateNotificationStatus']);
+
+        // --- Questions Management ---
+        Route::get('/questions', [QuestionController::class, 'index']);
+        Route::delete('/questions/{id}', [QuestionController::class, 'destroy']);
 
         // --- NEW: Manual Payment Management ---
         Route::get('/payment-requests', [PaymentRequestController::class, 'index']);
@@ -245,6 +250,9 @@ Route::middleware(['auth:sanctum', EnsureFrontendRequestsAreStateful::class])->g
     Route::post('/progress/start', [ProgressController::class, 'startTracking']);
     Route::post('/progress/update', [ProgressController::class, 'updateProgress']);
     Route::get('/progress/my-learning', [ProgressController::class, 'getMyLearning']);
+
+    // --- Questions Submission ---
+    Route::post('/questions', [QuestionController::class, 'store']);
 });
 
 
