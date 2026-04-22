@@ -11,6 +11,7 @@ import 'providers/auth_provider.dart';
 import 'providers/content_cache_provider.dart';
 import 'providers/bookmark_provider.dart';
 
+import 'providers/navigation_provider.dart';
 import 'widgets/bottom_navigation_bar.dart';
 import 'bottom_navigation/home_page.dart';
 import 'bottom_navigation/library_page.dart';
@@ -171,6 +172,7 @@ Future<void> main() async {
             ChangeNotifierProvider(create: (context) => AuthProvider()),
             ChangeNotifierProvider(create: (context) => ContentCacheProvider()),
             ChangeNotifierProvider(create: (context) => BookmarkProvider()),
+            ChangeNotifierProvider(create: (context) => NavigationProvider()),
             ChangeNotifierProvider.value(value: notificationService),
           ],
           child: const BayyinahCloneApp(),
@@ -442,7 +444,8 @@ class MainScreen extends StatefulWidget {
 }
 
 class _MainScreenState extends State<MainScreen> {
-  int _currentIndex = 0;
+  // Navigation is now managed by NavigationProvider
+  // int _currentIndex = 0;
 
   late Connectivity _connectivity;
   late Stream<ConnectivityResult> _connectivityStream;
@@ -555,10 +558,8 @@ class _MainScreenState extends State<MainScreen> {
   }
 
   void _switchToBottomNavPage(int index) {
-    if (!mounted || _currentIndex == index) return;
-    setState(() {
-      _currentIndex = index;
-    });
+    if (!mounted) return;
+    Provider.of<NavigationProvider>(context, listen: false).setMainIndex(index);
   }
 
   @override
@@ -590,7 +591,7 @@ class _MainScreenState extends State<MainScreen> {
         children: [
           Expanded(
             child: IndexedStack(
-              index: _currentIndex,
+              index: Provider.of<NavigationProvider>(context).mainIndex,
               children: _pages,
             ),
           ),
@@ -598,7 +599,7 @@ class _MainScreenState extends State<MainScreen> {
         ],
       ),
       bottomNavigationBar: BottomNavigationBarWidget(
-        currentIndex: _currentIndex,
+        currentIndex: Provider.of<NavigationProvider>(context).mainIndex,
         onTap: (index) {
           _switchToBottomNavPage(index);
         },

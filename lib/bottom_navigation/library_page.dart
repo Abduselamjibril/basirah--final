@@ -6,6 +6,7 @@ import '../story/beyond_story.dart';
 import '../commentary/commentary_page.dart';
 import '../deeper_look/deeper_look_page.dart';
 import '../theme_provider.dart';
+import '../providers/navigation_provider.dart';
 
 // Import Notification Service
 import '../services/notification_service.dart';
@@ -23,7 +24,33 @@ class LibraryPage extends StatefulWidget {
   }
 }
 
-class _LibraryPageState extends State<LibraryPage> {
+class _LibraryPageState extends State<LibraryPage> with SingleTickerProviderStateMixin {
+  late TabController _tabController;
+
+  @override
+  void initState() {
+    super.initState();
+    final navProvider = Provider.of<NavigationProvider>(context, listen: false);
+    _tabController = TabController(
+      length: 5,
+      vsync: this,
+      initialIndex: navProvider.libraryTabIndex,
+    );
+    // Listen to changes in the controller to update the provider if the user swipes
+    _tabController.addListener(() {
+      if (_tabController.indexIsChanging) return;
+      if (navProvider.libraryTabIndex != _tabController.index) {
+        navProvider.setLibraryTab(_tabController.index);
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     final themeProvider = Provider.of<ThemeProvider>(context);
@@ -35,9 +62,13 @@ class _LibraryPageState extends State<LibraryPage> {
     final Color unselectedTextColor =
         isNightMode ? Colors.white70 : Colors.white.withOpacity(0.7);
 
-    return DefaultTabController(
-      length: 5,
-      child: Scaffold(
+    // Sync tab controller with provider if changed externally
+    final navProvider = Provider.of<NavigationProvider>(context);
+    if (_tabController.index != navProvider.libraryTabIndex) {
+      _tabController.animateTo(navProvider.libraryTabIndex);
+    }
+
+    return Scaffold(
         backgroundColor: backgroundColor,
         appBar: AppBar(
           title: const Text(
@@ -53,6 +84,7 @@ class _LibraryPageState extends State<LibraryPage> {
           foregroundColor: Colors.white,
           elevation: 1,
           bottom: TabBar(
+            controller: _tabController,
             isScrollable: true,
             indicatorColor: Colors.white,
             indicatorWeight: 3.5,
@@ -84,6 +116,7 @@ class _LibraryPageState extends State<LibraryPage> {
           ),
         ),
         body: TabBarView(
+          controller: _tabController,
           children: [
             CoursesPage(),
             SurahPage(),
@@ -92,7 +125,6 @@ class _LibraryPageState extends State<LibraryPage> {
             DeeperLookPage(),
           ],
         ),
-      ),
-    );
-  }
+      );
+    }
 }
