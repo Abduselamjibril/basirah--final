@@ -10,6 +10,7 @@ import '../providers/navigation_provider.dart';
 
 // Import Notification Service
 import '../services/notification_service.dart';
+import '../screens/ask_question_page.dart';
 
 class LibraryPage extends StatefulWidget {
   final NotificationService? notificationService;
@@ -124,6 +125,16 @@ class _LibraryPageState extends State<LibraryPage> with SingleTickerProviderStat
             CommentaryPage(),
             DeeperLookPage(),
           ],
+        ),
+        floatingActionButton: FloatingActionButton(
+          onPressed: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => const AskQuestionPage()),
+            );
+          },
+          backgroundColor: const Color(0xFF009B77),
+          child: const Icon(Icons.question_answer_rounded, color: Colors.white),
         ),
       );
     }
