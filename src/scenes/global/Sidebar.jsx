@@ -8,6 +8,7 @@ import HomeOutlinedIcon from "@mui/icons-material/HomeOutlined";
 import NotificationsOutlinedIcon from "@mui/icons-material/NotificationsOutlined";
 import HelpOutlineOutlinedIcon from "@mui/icons-material/HelpOutlineOutlined";
 import PersonOutlinedIcon from "@mui/icons-material/PersonOutlined";
+import QuestionAnswerOutlinedIcon from "@mui/icons-material/QuestionAnswerOutlined";
 import MenuOutlinedIcon from "@mui/icons-material/MenuOutlined";
 import CloudUploadOutlinedIcon from "@mui/icons-material/CloudUploadOutlined";
 import ExpandMoreOutlinedIcon from "@mui/icons-material/ExpandMoreOutlined";
@@ -95,6 +96,7 @@ const SidebarContent = () => {
                         {can('view_dashboard') && <Item title="Dashboard" to="/dashboard" icon={<HomeOutlinedIcon />} selected={selected} setSelected={setSelected} />}
                         {can('view_notifications') && <Item title="Notifications" to="/notificationpage" icon={<NotificationsOutlinedIcon />} selected={selected} setSelected={setSelected} />}
                         {can('manage_faq') && <Item title="FAQ Page" to="/faq" icon={<HelpOutlineOutlinedIcon />} selected={selected} setSelected={setSelected} />}
+                        <Item title="Questions" to="/questions" icon={<QuestionAnswerOutlinedIcon />} selected={selected} setSelected={setSelected} />
                         
                         {user?.is_super_admin && (
                             <>

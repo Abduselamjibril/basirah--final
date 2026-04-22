@@ -28,6 +28,7 @@ import GiftPurchases from "./scenes/gift_purchases";
 import RolesAndPermissions from "./scenes/roles";
 import FinancialReportPage from "./scenes/financial_report"; 
 import PayoutsPage from "./scenes/payouts";
+import Questions from "./scenes/questions";
 
 // --- NEW SCENE IMPORTS FOR APP PAGES ---
 import AboutUsPage from "./scenes/app_pages/AboutUsPage";
@@ -53,6 +54,7 @@ function AuthenticatedApp() {
           <Route path="/roles" element={<RolesAndPermissions />} />
           <Route path="/financial-report" element={<FinancialReportPage />} />
           <Route path="/payouts" element={<PayoutsPage />} />
+          <Route path="/questions" element={<Questions />} />
           <Route path="/profile" element={<Profile onLogout={logout} />} />
           <Route path="/upload/surah" element={<SurahUpload />} />
           <Route path="/upload/course" element={<CourseManager />} />
