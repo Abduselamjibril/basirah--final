@@ -15,6 +15,7 @@ import '../playlist_detail_page.dart';
 import '../providers/auth_provider.dart';
 // --- NEW IMPORT ---
 import '../providers/content_cache_provider.dart';
+import '../providers/navigation_provider.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -248,14 +249,23 @@ class _HomePageState extends State<HomePage> {
                     Container(
                       decoration: BoxDecoration(
                         color: isNightMode
-                            ? Colors.black.withOpacity(0.3)
-                            : Colors.white.withOpacity(0.9),
-                        borderRadius: BorderRadius.circular(12.0),
-                        boxShadow: const [
+                            ? Colors.black.withOpacity(0.4)
+                            : Colors.white,
+                        borderRadius: BorderRadius.circular(16.0),
+                        border: Border.all(
+                          color: isNightMode 
+                              ? Colors.white.withOpacity(0.1) 
+                              : const Color(0xFF009B77).withOpacity(0.2),
+                          width: 1.5,
+                        ),
+                        boxShadow: [
                           BoxShadow(
-                            color: Colors.black12,
-                            blurRadius: 8,
-                            offset: Offset(0, 2),
+                            color: isNightMode 
+                                ? Colors.black26 
+                                : const Color(0xFF009B77).withOpacity(0.1),
+                            blurRadius: 12,
+                            spreadRadius: 2,
+                            offset: const Offset(0, 4),
                           )
                         ],
                       ),
@@ -366,15 +376,19 @@ class _HomePageState extends State<HomePage> {
   }) {
     final itemsToShow = content.take(4).toList();
     Widget? seeAllButton;
-    if (content.length > 4 && searchQuery.isEmpty) {
+    if (searchQuery.isEmpty) {
       seeAllButton = TextButton(
         onPressed: () {
-          ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text("Navigating to $title page..."),
-                behavior: SnackBarBehavior.floating,
-                margin: const EdgeInsets.fromLTRB(24.0, 0.0, 24.0, 20.0),
-              ));
+          final navProvider = Provider.of<NavigationProvider>(context, listen: false);
+          int tabIndex = 0;
+          switch (contentType) {
+            case 'course': tabIndex = 0; break;
+            case 'surah': tabIndex = 1; break;
+            case 'story': tabIndex = 2; break;
+            case 'commentary': tabIndex = 3; break;
+            case 'deeperLook': tabIndex = 4; break;
+          }
+          navProvider.setLibraryTab(tabIndex);
         },
         child: Text('See All',
             style: TextStyle(
@@ -434,7 +448,7 @@ class _HomePageState extends State<HomePage> {
                       ),
                     ))
                   : SizedBox(
-                      height: 240,
+                      height: 195, // Reduced from 240 to remove empty bottom space
                       child: ListView.separated(
                         scrollDirection: Axis.horizontal,
                         itemCount: itemsToShow.length,
@@ -491,11 +505,11 @@ class _HomePageState extends State<HomePage> {
                       const BorderRadius.vertical(top: Radius.circular(16.0)),
                   child: CachedNetworkImage(
                     imageUrl: imageUrl ?? '',
-                    height: 140,
+                    height: 101, // 16:9 aspect ratio for 180 width
                     width: double.infinity,
                     fit: BoxFit.cover,
                     placeholder: (context, url) => Container(
-                      height: 140,
+                      height: 101,
                       color: isNightMode ? Colors.grey[800] : Colors.grey[200],
                       child: const Center(
                           child: CircularProgressIndicator(
@@ -503,7 +517,7 @@ class _HomePageState extends State<HomePage> {
                     ),
                     errorWidget: (context, url, error) => Container(
                       color: isNightMode ? Colors.grey[800] : Colors.grey[200],
-                      height: 140,
+                      height: 101,
                       child: Center(
                           child: Icon(Icons.broken_image_outlined,
                               color: isNightMode
