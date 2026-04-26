@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { CssBaseline, ThemeProvider, Box, CircularProgress } from "@mui/material";
+import { ProSidebarProvider } from "react-pro-sidebar";
 import { ColorModeContext, useMode } from "./theme";
 
 // --- SCENE IMPORTS ---
@@ -40,7 +41,7 @@ function AuthenticatedApp() {
   const { logout } = useAuth();
 
   return (
-    <>
+    <ProSidebarProvider>
       <Sidebar />
       <main className="content">
         <Topbar onLogout={logout} />
@@ -77,7 +78,7 @@ function AuthenticatedApp() {
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>
       </main>
-    </>
+    </ProSidebarProvider>
   );
 }
 

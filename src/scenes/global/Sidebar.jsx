@@ -77,7 +77,7 @@ const SidebarContent = () => {
             '& .ps-menu-button': { padding: '8px 20px 8px 16px !important', margin: '4px 0', borderRadius: '8px', transition: 'all 0.2s ease !important', '&:hover': { backgroundColor: 'rgba(0, 200, 149, 0.1) !important', color: `${colors.greenAccent[500]} !important` } },
             '& .ps-menu-item.ps-active > .ps-menu-button': { color: `${colors.greenAccent[500]} !important` },
         }}>
-            <Sidebar collapsed={collapsed} width="270px" collapsedWidth="80px" backgroundColor="transparent">
+            <Sidebar breakPoint="md" collapsed={collapsed} width="270px" collapsedWidth="80px" backgroundColor="transparent">
                 <Menu>
                     <MenuItem onClick={() => collapseSidebar()} icon={collapsed ? <MenuOutlinedIcon /> : undefined} style={{ margin: "16px 0 24px 0", color: colors.grey[100] }}>
                         {!collapsed && ( <Box display="flex" justifyContent="space-between" alignItems="center" ml="12px"><Typography variant="h3" color={colors.grey[100]} fontWeight="bold">ADMIN</Typography><IconButton onClick={() => collapseSidebar()} sx={{ color: colors.grey[100] }}><MenuOutlinedIcon /></IconButton></Box> )}
@@ -179,9 +179,7 @@ const AppPagesManager = ({ selected, setSelected, can }) => {
 }
 
 const SidebarComponent = () => (
-    <ProSidebarProvider>
-        <SidebarContent />
-    </ProSidebarProvider>
+    <SidebarContent />
 );
 
 export default SidebarComponent;

@@ -193,8 +193,15 @@ const UserList = () => {
       <Header title="USER MANAGEMENT" subtitle="List of users, their payments, and gift assignments" />
       
       <Paper sx={{ p: 3, backgroundColor: theme.palette.background.paper, borderRadius: '12px' }}>
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-          <FormControl sx={{ minWidth: 200 }} size="small">
+        <Box sx={{ 
+          display: 'flex', 
+          justifyContent: 'space-between', 
+          alignItems: { xs: 'stretch', sm: 'center' }, 
+          flexDirection: { xs: 'column', sm: 'row' },
+          gap: 2,
+          mb: 2 
+        }}>
+          <FormControl sx={{ minWidth: { xs: '100%', sm: 200 } }} size="small">
             <InputLabel>Filter by Status</InputLabel>
             <Select
               value={filterStatus}
@@ -208,7 +215,7 @@ const UserList = () => {
             </Select>
           </FormControl>
           
-          <Box display="flex" backgroundColor={theme.palette.background.default} borderRadius="8px" p="2px 10px">
+          <Box display="flex" backgroundColor={theme.palette.background.default} borderRadius="8px" p="2px 10px" sx={{ width: { xs: '100%', sm: 'auto' } }}>
             <InputBase
               sx={{ ml: 1, flex: 1 }}
               placeholder="Search by name, phone, or email"

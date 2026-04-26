@@ -25,13 +25,14 @@ const StyledCard = styled(Card)(({ theme }) => ({
 const SurahManager = () => {
   const theme = useTheme();
   const [surahs, setSurahs] = useState([]);
-  const [formData, setFormData] = useState({ name: '', description: '', image: null });
+  const [formData, setFormData] = useState({ name: '', description: '', juz: '', image: null });
   const [editingId, setEditingId] = useState(null);
   const [previewImage, setPreviewImage] = useState(null);
   const [openDeleteDialog, setOpenDeleteDialog] = useState(false);
   const [deleteId, setDeleteId] = useState(null);
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
   const [loading, setLoading] = useState({ submit: false, page: true, delete: false, lock: null });
+  const [filterJuz, setFilterJuz] = useState('');
   const navigate = useNavigate();
 
   const showSnackbar = useCallback((message, severity = 'success') => {
@@ -41,18 +42,20 @@ const SurahManager = () => {
   const fetchSurahs = useCallback(async () => {
     setLoading(prev => ({ ...prev, page: true }));
     try {
-      const { data } = await apiClient.get('/surahs');
+      const { data } = await apiClient.get('/surahs', {
+        params: filterJuz ? { juz: filterJuz } : {}
+      });
       setSurahs(data.data || []);
     } catch (error) {
       showSnackbar('Failed to fetch surahs', 'error');
     } finally {
       setLoading(prev => ({ ...prev, page: false }));
     }
-  }, [showSnackbar]);
+  }, [showSnackbar, filterJuz]);
 
   useEffect(() => {
     fetchSurahs();
-  }, [fetchSurahs]);
+  }, [fetchSurahs, filterJuz]);
 
   const handleChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
 
@@ -77,6 +80,7 @@ const SurahManager = () => {
     const data = new FormData();
     data.append('name', formData.name);
     data.append('description', formData.description || '');
+    if (formData.juz) data.append('juz', formData.juz);
 
     // Handle the three image states to match the backend controller
     if (formData.image instanceof File) {
@@ -115,7 +119,7 @@ const SurahManager = () => {
   };
   
   const handleEdit = (surah) => {
-    setFormData({ name: surah.name, description: surah.description, image: 'unchanged' }); // Use 'unchanged' to start
+    setFormData({ name: surah.name, description: surah.description, juz: surah.juz || '', image: 'unchanged' }); // Use 'unchanged' to start
     setEditingId(surah.id);
     setPreviewImage(surah.image || null);
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -164,7 +168,7 @@ const SurahManager = () => {
   };
 
   const resetForm = () => {
-    setFormData({ name: '', description: '', image: null });
+    setFormData({ name: '', description: '', juz: '', image: null });
     setEditingId(null);
     setPreviewImage(null);
   };
@@ -184,6 +188,12 @@ const SurahManager = () => {
             <Grid item xs={12} md={6}>
               <TextField fullWidth label="Surah Name" name="name" value={formData.name} onChange={handleChange} required variant="filled" InputProps={{ startAdornment: (<Title color="action" sx={{ mr: 1 }} />) }} />
               <TextField fullWidth label="Description" name="description" value={formData.description} onChange={handleChange} multiline rows={4} sx={{ mt: 2 }} variant="filled" InputProps={{ startAdornment: (<Description color="action" sx={{ mr: 1 }} />) }} />
+              <TextField fullWidth select label="Juz" name="juz" value={formData.juz} onChange={handleChange} SelectProps={{ native: true }} variant="filled" sx={{ mt: 2 }} InputProps={{ startAdornment: (<Typography color="action" sx={{ mr: 1, fontWeight: 'bold' }}>J</Typography>) }}>
+                <option value="">Select Juz (Optional)</option>
+                {[...Array(30)].map((_, i) => (
+                  <option key={i + 1} value={i + 1}>Juz {i + 1}</option>
+                ))}
+              </TextField>
             </Grid>
             <Grid item xs={12} md={6} sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
               <Avatar src={previewImage} variant="rounded" sx={{ width: 200, height: 200, mb: 2, bgcolor: 'action.hover' }}>
@@ -213,6 +223,29 @@ const SurahManager = () => {
           </Box>
         </form>
       </Paper>
+
+      {/* FILTER SECTION */}
+      <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}>
+        <Typography variant="h5" color="text.primary" sx={{ fontWeight: 'bold' }}>
+          All Surahs {filterJuz && <Chip label={`Juz ${filterJuz}`} color="primary" variant="outlined" size="small" />}
+        </Typography>
+        <TextField
+          select
+          label="Filter by Juz"
+          value={filterJuz}
+          onChange={(e) => setFilterJuz(e.target.value)}
+          SelectProps={{ native: true }}
+          variant="outlined"
+          size="small"
+          sx={{ minWidth: 200 }}
+        >
+          <option value="">All Juzes</option>
+          {[...Array(30)].map((_, i) => (
+            <option key={i + 1} value={i + 1}>Juz {i + 1}</option>
+          ))}
+        </TextField>
+      </Box>
+
       {loading.page ? (
         <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}><CircularProgress color="secondary"/></Box>
       ) : (
@@ -224,7 +257,10 @@ const SurahManager = () => {
                   <Chip label="PREMIUM" color="warning" size="small" sx={{ position: 'absolute', top: 10, right: 10, zIndex: 1, visibility: surah.is_premium ? 'visible' : 'hidden' }} />
                   <CardMedia component="img" height="160" image={surah.image || '/placeholder-surah.jpg'} alt={surah.name} />
                   <CardContent>
-                    <Typography gutterBottom variant="h6" component="div">{surah.name}</Typography>
+                    <Typography gutterBottom variant="h6" component="div">
+                      {surah.name}
+                      {surah.juz && <Chip label={`Juz ${surah.juz}`} size="small" color="primary" sx={{ ml: 1, height: '20px' }} />}
+                    </Typography>
                     <Typography variant="body2" color="text.secondary" sx={{ minHeight: '40px', overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
                       {surah.description}
                     </Typography>

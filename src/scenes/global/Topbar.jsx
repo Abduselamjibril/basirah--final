@@ -5,11 +5,14 @@ import LightModeOutlinedIcon from "@mui/icons-material/LightModeOutlined";
 import DarkModeOutlinedIcon from "@mui/icons-material/DarkModeOutlined";
 import PersonOutlinedIcon from "@mui/icons-material/PersonOutlined";
 import { useNavigate } from "react-router-dom";
+import { useProSidebar } from "react-pro-sidebar";
+import MenuOutlinedIcon from "@mui/icons-material/MenuOutlined";
 
 const Topbar = () => {
   const theme = useTheme();
   const colorMode = useContext(ColorModeContext);
   const navigate = useNavigate();
+  const { toggleSidebar } = useProSidebar();
 
   const handleProfileClick = () => {
     navigate("/profile");
@@ -19,7 +22,12 @@ const Topbar = () => {
     <Box display="flex" justifyContent="space-between" p={2}>
       {/* SEARCH BAR placeholder */}
       <Box display="flex" borderRadius="3px">
-        {/* Intentionally empty for layout */}
+        <IconButton
+          sx={{ display: { xs: "block", md: "none" } }}
+          onClick={() => toggleSidebar()}
+        >
+          <MenuOutlinedIcon />
+        </IconButton>
       </Box>
 
       {/* ICONS */}
