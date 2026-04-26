@@ -709,6 +709,25 @@ class _SurahDetailPageState extends State<SurahDetailPage> {
               color: isNightMode ? Colors.white : Colors.black87,
             ),
           ),
+          if (_content['juz'] != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF009B77).withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  'Juz ${_content['juz']}',
+                  style: const TextStyle(
+                    color: Color(0xFF009B77),
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                  ),
+                ),
+              ),
+            ),
         ],
       ),
     );

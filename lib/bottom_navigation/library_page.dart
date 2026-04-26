@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../course/quranic_course.dart';
 import '../surah/surah_page.dart';
+import '../surah/juz_selection_page.dart';
 import '../story/beyond_story.dart';
 import '../commentary/commentary_page.dart';
 import '../deeper_look/deeper_look_page.dart';
@@ -120,7 +121,7 @@ class _LibraryPageState extends State<LibraryPage> with SingleTickerProviderStat
           controller: _tabController,
           children: [
             CoursesPage(),
-            SurahPage(),
+            const JuzSelectionPage(),
             StoryNightPage(),
             CommentaryPage(),
             DeeperLookPage(),

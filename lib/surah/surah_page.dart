@@ -11,7 +11,8 @@ import '../../providers/content_cache_provider.dart';
 import '../../providers/bookmark_provider.dart';
 
 class SurahPage extends StatefulWidget {
-  const SurahPage({super.key});
+  final int? filterJuz;
+  const SurahPage({super.key, this.filterJuz});
   @override
   _SurahPageState createState() => _SurahPageState();
 }
@@ -178,7 +179,9 @@ class _SurahPageState extends State<SurahPage> {
       final name = surah['name']?.toString().toLowerCase() ?? '';
       final description = surah['description']?.toString().toLowerCase() ?? '';
       final query = searchQuery.toLowerCase();
-      return name.contains(query) || description.contains(query);
+      final juzMatch = widget.filterJuz == null || 
+                      (surah['juz'] != null && int.parse(surah['juz'].toString()) == widget.filterJuz);
+      return (name.contains(query) || description.contains(query)) && juzMatch;
     }).toList();
 
     return Scaffold(
@@ -187,8 +190,8 @@ class _SurahPageState extends State<SurahPage> {
         backgroundColor:
             isNightMode ? Colors.grey[900] : const Color(0xFF009B77),
         elevation: 0,
-        title: const Text('Objective of Surahs',
-            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        title: Text(widget.filterJuz != null ? 'Surahs in Juz ${widget.filterJuz}' : 'Objective of Surahs',
+            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
         centerTitle: true,
       ),
       body: Column(
@@ -338,6 +341,25 @@ class _SurahPageState extends State<SurahPage> {
                   fontSize: 13),
             ),
             trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+              if (surah['juz'] != null)
+                Padding(
+                  padding: const EdgeInsets.only(right: 8.0),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF009B77).withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Text(
+                      'Juz ${surah['juz']}',
+                      style: const TextStyle(
+                        color: Color(0xFF009B77),
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ),
               if (showPremiumIcon)
                 Padding(
                     padding: const EdgeInsets.only(right: 4.0),
