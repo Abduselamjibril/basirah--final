@@ -14,6 +14,7 @@ class Surah extends Model
         'image',
         'description',
         'is_premium',
+        'juz',
     ];
 
     public function episodes()

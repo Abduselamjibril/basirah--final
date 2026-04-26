@@ -10,12 +10,19 @@ use App\Http\Resources\SurahResource; // Import new resource
 
 class SurahController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        $surahs = Cache::remember('surahs_all', 3600, function () {
-            return Surah::with('episodes')->get();
+        $juz = $request->query('juz');
+        $cacheKey = 'surahs_all' . ($juz ? "_juz_$juz" : "");
+
+        $surahs = Cache::remember($cacheKey, 3600, function () use ($juz) {
+            $query = Surah::withCount('episodes');
+            if ($juz) {
+                $query->where('juz', $juz);
+            }
+            return $query->latest()->get();
         });
-        // Use the resource to transform the collection
+
         return SurahResource::collection($surahs);
     }
 
@@ -37,12 +44,14 @@ class SurahController extends Controller
             'image' => 'image|nullable|max:2048',
             'description' => 'nullable|string',
             'is_premium' => 'boolean',
+            'juz' => 'nullable|integer|min:1|max:30',
         ]);
 
         $surah = new Surah();
         $surah->name = $validated['name'];
         $surah->description = $validated['description'] ?? null;
         $surah->is_premium = $validated['is_premium'] ?? false;
+        $surah->juz = $validated['juz'] ?? null;
 
         if ($request->hasFile('image')) {
             $surah->image = $request->file('image')->store('surahs', 'public');
@@ -67,6 +76,7 @@ class SurahController extends Controller
             'image' => 'image|nullable|max:2048',
             'description' => 'nullable|string',
             'is_premium' => 'sometimes|boolean',
+            'juz' => 'sometimes|nullable|integer|min:1|max:30',
         ]);
 
         $surah->fill($validated);

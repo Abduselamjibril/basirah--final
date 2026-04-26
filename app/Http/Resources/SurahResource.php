@@ -28,6 +28,7 @@ class SurahResource extends JsonResource
             'name' => $this->name,
             'description' => $this->description,
             'image' => $this->image ? Storage::disk('public')->url($this->image) : null,
+            'juz' => $this->juz,
             
             // Admins need to see the REAL database value to toggle it in the React panel.
             'is_premium' => $isAdmin ? (bool) $this->is_premium : ((bool) $this->is_premium && !$hasFullAccess),

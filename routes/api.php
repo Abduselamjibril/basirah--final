@@ -150,12 +150,12 @@ Route::prefix('admin')->group(function () {
 
         // Course Management
         Route::post('/courses', [CourseController::class, 'store']);
-        Route::put('/courses/{id}', [CourseController::class, 'update']);
+        Route::post('/courses/{id}', [CourseController::class, 'update']);
         Route::delete('/courses/{id}', [CourseController::class, 'destroy']);
         Route::post('/courses/{id}/lock', [CourseController::class, 'lock']);
         Route::post('/courses/{id}/unlock', [CourseController::class, 'unlock']);
         Route::post('/courses/{courseId}/episodes', [EpisodeController::class, 'store']);
-        Route::put('/courses/{courseId}/episodes/{episodeId}', [EpisodeController::class, 'update']);
+        Route::post('/courses/{courseId}/episodes/{episodeId}', [EpisodeController::class, 'update']);
         Route::delete('/courses/{courseId}/episodes/{episodeId}', [EpisodeController::class, 'destroy']);
         Route::post('/courses/{courseId}/episodes/{episodeId}/lock', [EpisodeController::class, 'lock']);
         Route::post('/courses/{courseId}/episodes/{episodeId}/unlock', [EpisodeController::class, 'unlock']);
@@ -164,48 +164,48 @@ Route::prefix('admin')->group(function () {
 
         // Story Management
         Route::post('/stories', [StoryController::class, 'store']);
-        Route::put('/stories/{story}', [StoryController::class, 'update']);
+        Route::post('/stories/{story}', [StoryController::class, 'update']);
         Route::delete('/stories/{story}', [StoryController::class, 'destroy']);
         Route::post('/stories/{story}/lock', [StoryController::class, 'lock']);
         Route::post('/stories/{story}/unlock', [StoryController::class, 'unlock']);
         Route::post('/stories/{story}/episodes', [StoryEpisodeController::class, 'store']);
-        Route::put('/episodes/{storyEpisode}', [StoryEpisodeController::class, 'update']);
+        Route::post('/episodes/{storyEpisode}', [StoryEpisodeController::class, 'update']);
         Route::delete('/episodes/{storyEpisode}', [StoryEpisodeController::class, 'destroy']);
         Route::post('/episodes/{storyEpisode}/lock', [StoryEpisodeController::class, 'lock']);
         Route::post('/episodes/{storyEpisode}/unlock', [StoryEpisodeController::class, 'unlock']);
 
         // Surah Management
         Route::post('/surahs', [SurahController::class, 'store']);
-        Route::put('/surahs/{id}', [SurahController::class, 'update']);
+        Route::post('/surahs/{id}', [SurahController::class, 'update']);
         Route::delete('/surahs/{id}', [SurahController::class, 'destroy']);
         Route::post('/surahs/{id}/lock', [SurahController::class, 'lock']);
         Route::post('/surahs/{id}/unlock', [SurahController::class, 'unlock']);
         Route::post('/surahs/{surah}/episodes', [SurahEpisodeController::class, 'store']);
-        Route::put('/surahs/{surah}/episodes/{episode}', [SurahEpisodeController::class, 'update'])->scopeBindings();
+        Route::post('/surahs/{surah}/episodes/{episode}', [SurahEpisodeController::class, 'update'])->scopeBindings();
         Route::delete('/surahs/{surah}/episodes/{episode}', [SurahEpisodeController::class, 'destroy']);
         Route::post('/surahs/{surah}/episodes/{episode}/lock', [SurahEpisodeController::class, 'lock']);
         Route::post('/surahs/{surah}/episodes/{episode}/unlock', [SurahEpisodeController::class, 'unlock']);
 
         // Deeper Look Management
         Route::post('/deeper-looks', [DeeperLookController::class, 'store']);
-        Route::put('/deeper-looks/{id}', [DeeperLookController::class, 'update']);
+        Route::post('/deeper-looks/{id}', [DeeperLookController::class, 'update']);
         Route::delete('/deeper-looks/{id}', [DeeperLookController::class, 'destroy']);
         Route::post('/deeper-looks/{id}/lock', [DeeperLookController::class, 'lock']);
         Route::post('/deeper-looks/{id}/unlock', [DeeperLookController::class, 'unlock']);
         Route::post('/deeper-looks/{deeperLook}/episodes', [DeeperLookEpisodeController::class, 'store']);
-        Route::put('/deeper-looks/{deeperLook}/episodes/{episode}', [DeeperLookEpisodeController::class, 'update']);
+        Route::post('/deeper-looks/{deeperLook}/episodes/{episode}', [DeeperLookEpisodeController::class, 'update']);
         Route::delete('/deeper-looks/{deeperLook}/episodes/{episode}', [DeeperLookEpisodeController::class, 'destroy']);
         Route::post('/deeper-looks/{deeperLook}/episodes/{episode}/lock', [DeeperLookEpisodeController::class, 'lock']);
         Route::post('/deeper-looks/{deeperLook}/episodes/{episode}/unlock', [DeeperLookEpisodeController::class, 'unlock']);
 
         // Commentary Management
         Route::post('/commentaries', [CommentaryController::class, 'store']);
-        Route::put('/commentaries/{id}', [CommentaryController::class, 'update']);
+        Route::post('/commentaries/{id}', [CommentaryController::class, 'update']);
         Route::delete('/commentaries/{id}', [CommentaryController::class, 'destroy']);
         Route::post('/commentaries/{id}/lock', [CommentaryController::class, 'lock']);
         Route::post('/commentaries/{id}/unlock', [CommentaryController::class, 'unlock']);
         Route::post('/commentaries/{commentary}/episodes', [CommentaryEpisodeController::class, 'store']);
-        Route::put('/commentaries/{commentary}/episodes/{episode}', [CommentaryEpisodeController::class, 'update']);
+        Route::post('/commentaries/{commentary}/episodes/{episode}', [CommentaryEpisodeController::class, 'update']);
         Route::delete('/commentaries/{commentary}/episodes/{episode}', [CommentaryEpisodeController::class, 'destroy']);
         Route::post('/commentaries/{commentary}/episodes/{episode}/lock', [CommentaryEpisodeController::class, 'lock']);
         Route::post('/commentaries/{commentary}/episodes/{episode}/unlock', [CommentaryEpisodeController::class, 'unlock']);
